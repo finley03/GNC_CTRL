@@ -12,7 +12,7 @@ int main(void) {
 	init();
 	
 	NAV_Data_Packet nav_data_packet;
-	char buffer[200];
+	char buffer[300];
 	
 	while(1) {
 		delay_ms(200);
@@ -32,12 +32,18 @@ int main(void) {
 		
 		
 		sprintf(buffer,
-		"Latitude: %f\nLongitude: %f\nHeight: %f\nHorizontal Accuracy: %f\nGNSS Satellites: %d\nAccel X: %f\nAccel Y: %f\nAccel Z: %f\nRotation X: %f\nRotation Y: %f\nRotation Z: %f\nPressure: %f\nTemperature: %f\n\n",
+		"Latitude: %f\nLongitude: %f\nHeight: %f\nHorizontal Accuracy: %f\nGNSS Satellites: %d\nPosition X: %f\nPosition Y: %f\nPosition Z: %f\nVelocity X: %f\nVelocity Y: %f\nVelocity Z: %f\nAccel X: %f\nAccel Y: %f\nAccel Z: %f\nRotation X: %f\nRotation Y: %f\nRotation Z: %f\nPressure: %f\nTemperature: %f\n\n",
 		nav_data_packet.bit.longitude,
 		nav_data_packet.bit.latitude,
 		nav_data_packet.bit.gps_height,
 		nav_data_packet.bit.h_acc,
 		nav_data_packet.bit.gps_satellites,
+		nav_data_packet.bit.position_x,
+		nav_data_packet.bit.position_y,
+		nav_data_packet.bit.position_z,
+		nav_data_packet.bit.velocity_x,
+		nav_data_packet.bit.velocity_y,
+		nav_data_packet.bit.velocity_z,
 		nav_data_packet.bit.accel_x,
 		nav_data_packet.bit.accel_y,
 		nav_data_packet.bit.accel_z,
