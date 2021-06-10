@@ -8,6 +8,13 @@ void serial_send(uint8_t data) {
 }
 
 
+void serial_stream(uint8_t* addr, uint32_t nr_bytes) {
+	for (uint32_t i = 0; i < nr_bytes; ++i) {
+		serial_send(addr[i]);
+	}
+}
+
+
 void serial_print(char *addr) {
 	while(*addr != 0) {
 		serial_send(*addr);
@@ -62,7 +69,7 @@ void serial_init() {
 	
 	
 	// set baud to 3000000
-	SERCOM2->USART.BAUD.reg = 0; // 45403
+	SERCOM2->USART.BAUD.reg = 0; // 63019
 	
 	
 	PORT_WRCONFIG_Type wrconfig = {
@@ -142,7 +149,7 @@ void nav_uart_init() {
 	
 	
 	// set baud to 115200
-	SERCOM0->USART.BAUD.reg = 0; // 63019
+	SERCOM0->USART.BAUD.reg = 0; // 65326
 	
 	
 	PORT_WRCONFIG_Type wrconfig = {

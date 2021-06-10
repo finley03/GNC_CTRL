@@ -11,6 +11,8 @@ void serial_init();
 
 void serial_send(uint8_t data);
 
+void serial_stream(uint8_t* addr, uint32_t nr_bytes);
+
 void serial_print(char *addr);
 
 
