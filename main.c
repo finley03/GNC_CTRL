@@ -1,18 +1,22 @@
 #include "main.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-
 
 void init();
+
+
+
 
 
 int main(void) {
 	
 	init();
 	
-	NAV_Data_Packet nav_data_packet;
-	NAV_Selftest_Packet nav_selftest_packet;
+	static NAV_Data_Packet nav_data_packet;
+	static NAV_Selftest_Packet nav_selftest_packet;
+	static CTRL_ACK_Packet ctrl_ack_packet;
+	ctrl_ack_packet.bit.device_id = DEVICE_ID;
+	
+
 	//char buffer[300];
 	//
 	//sprintf(buffer, "Selftest size: %d\nData size: %d\n", sizeof(nav_selftest_packet.reg), sizeof(nav_data_packet.reg));
@@ -21,6 +25,7 @@ int main(void) {
 	while(1) {
 		delay_ms(20);
 		
+		REG_PORT_OUTSET1 = LED;
 		nav_uart_send(0x81);
 			
 		for (uint32_t i = 0; i < sizeof(nav_data_packet.reg); ++i) {
@@ -32,8 +37,9 @@ int main(void) {
 		
 		if (gen_crc32((uint32_t) &nav_data_packet.reg[0], sizeof(nav_data_packet.reg)) != 0x2144df1c) {
 			//serial_print("CRC Check Failed\n");
-			REG_PORT_OUTSET0 = (1 << 11);
+			//REG_PORT_OUTSET0 = (1 << 11);
 		}
+		REG_PORT_OUTCLR1 = LED;
 		
 		
 		//sprintf(buffer,
@@ -63,12 +69,30 @@ int main(void) {
 		
 		
 		// check for data request from computer
+		// MSB is one for requests to NAV computer
+		// zero for requests to the CTRL computer
 		if (SERCOM2->USART.INTFLAG.bit.RXC) {
 			uint8_t command = SERCOM2->USART.DATA.reg;
 			
 			while(SERCOM2->USART.INTFLAG.bit.RXC) SERCOM2->USART.DATA.reg;
 			
 			switch (command) {
+					// test
+				case 0x40:
+					// set acknowledge response to ok
+					ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+					ctrl_ack_packet.bit.crc = gen_crc32((uint32_t) ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+					// send acknowledge packet
+					serial_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+					// wait for data return
+					while (!SERCOM2->USART.INTFLAG.bit.RXC);
+					// get data
+					uint8_t value = SERCOM2->USART.DATA.reg;
+					// print value
+					LED_print_8(value);
+					break;
+				
+					// case for nav self test
 				case 0x80:
 					// send command for self test
 					nav_uart_send(0x80);
@@ -88,6 +112,7 @@ int main(void) {
 					serial_stream(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg));
 					break;
 			
+					// command to send nav_data_packet
 				case 0x81:
 					serial_stream(nav_data_packet.reg, sizeof(nav_data_packet.reg));
 					break;
@@ -185,11 +210,13 @@ void init() {
 	spi_init();
 	
 	// set LED to output
-	REG_PORT_DIRSET1 = (1 << 11);
+	REG_PORT_DIRSET1 = LED;
 	
 	// set SS pins high
 	REG_PORT_DIRSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
 	REG_PORT_OUTSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
+	
+	//ctrl_ack_packet.bit.device_id = DEVICE_ID;
 	
 	
 	//serial_print("Embedded Navigation v0.0.2\nFinley Blaine 2021\n\n");

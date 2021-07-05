@@ -1,6 +1,24 @@
 #include "util.h"
 
 
+void LED_print_8(uint8_t data) {
+	for (uint16_t i = 0; i < 8; ++i) {
+		uint8_t bit = data & 0x80;
+		
+		if (bit != 0) {
+			REG_PORT_OUTSET1 = LED;
+		}
+		
+		delay_ms(250);
+		
+		REG_PORT_OUTCLR1 = LED;
+		
+		delay_ms(250);
+		
+		data = (data << 1);
+	}
+}
+
 
 void crc_init() {
 	// enable writing to DSU
