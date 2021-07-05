@@ -118,3 +118,57 @@ typedef union __attribute__((aligned(4))) {
 	
 	uint8_t reg[sizeof(CTRL_ACK_Packet_Type)];
 } CTRL_ACK_Packet;
+
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t device_id;
+	
+	uint8_t status;
+	uint8_t data;
+	
+	uint32_t crc;
+} CTRL_EEPROM_Read_Packet_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	CTRL_EEPROM_Read_Packet_Type bit;
+	
+	uint8_t reg[sizeof(CTRL_EEPROM_Read_Packet_Type)];
+} CTRL_EEPROM_Read_packet;
+
+
+#define EEPROM_READ_REQUEST_HEADER 0x0001
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint32_t address;
+	
+	uint32_t crc;
+} EEPROM_Read_Request_type;
+
+
+typedef union __attribute__((aligned(4))) {
+	EEPROM_Read_Request_type bit;
+	
+	uint8_t reg[sizeof(EEPROM_Read_Request_type)];
+} EEPROM_Read_Request;
+
+
+#define EEPROM_WRITE_REQUEST_HEADER 0x0002
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint32_t address;
+	uint8_t data;
+	
+	uint32_t crc;
+} EEPROM_Write_Request_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	EEPROM_Write_Request_Type bit;
+	
+	uint8_t reg[sizeof(EEPROM_Write_Request_Type)];
+} EEPROM_Write_Request;

@@ -23,6 +23,16 @@ void serial_print(char *addr) {
 }
 
 
+void serial_read(uint8_t* addr, uint32_t n) {
+	for (uint32_t i = 0; i < n; ++i) {
+		// wait until data available
+		while(!SERCOM2->USART.INTFLAG.bit.RXC);
+				
+		addr[i] = (uint8_t) (SERCOM2->USART.DATA.reg);
+	}
+}
+
+
 void serial_init() {
 	// uses SERCOM2 (PA08 - PA11)
 	

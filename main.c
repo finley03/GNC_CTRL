@@ -4,23 +4,17 @@
 void init();
 
 
-
+static NAV_Data_Packet nav_data_packet;
+static NAV_Selftest_Packet nav_selftest_packet;
+static CTRL_ACK_Packet ctrl_ack_packet;
 
 
 int main(void) {
 	
 	init();
 	
-	static NAV_Data_Packet nav_data_packet;
-	static NAV_Selftest_Packet nav_selftest_packet;
-	static CTRL_ACK_Packet ctrl_ack_packet;
-	ctrl_ack_packet.bit.device_id = DEVICE_ID;
 	
 
-	//char buffer[300];
-	//
-	//sprintf(buffer, "Selftest size: %d\nData size: %d\n", sizeof(nav_selftest_packet.reg), sizeof(nav_data_packet.reg));
-	//serial_print(buffer);
 	
 	while(1) {
 		delay_ms(20);
@@ -35,61 +29,92 @@ int main(void) {
 			nav_data_packet.reg[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
 		}
 		
-		if (gen_crc32((uint32_t) &nav_data_packet.reg[0], sizeof(nav_data_packet.reg)) != 0x2144df1c) {
+		if (gen_crc32((uint32_t) &nav_data_packet.reg[0], sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
 			//serial_print("CRC Check Failed\n");
-			//REG_PORT_OUTSET0 = (1 << 11);
+			REG_PORT_OUTSET1 = LED;
 		}
 		REG_PORT_OUTCLR1 = LED;
 		
-		
-		//sprintf(buffer,
-		//"Latitude: %f\nLongitude: %f\nHeight: %f\nHorizontal Accuracy: %f\nGNSS Satellites: %d\nPosition X: %f\nPosition Y: %f\nPosition Z: %f\nVelocity X: %f\nVelocity Y: %f\nVelocity Z: %f\nAccel X: %f\nAccel Y: %f\nAccel Z: %f\nRotation X: %f\nRotation Y: %f\nRotation Z: %f\nPressure: %f\nTemperature: %f\n\n",
-		//nav_data_packet.bit.longitude,
-		//nav_data_packet.bit.latitude,
-		//nav_data_packet.bit.gps_height,
-		//nav_data_packet.bit.h_acc,
-		//nav_data_packet.bit.gps_satellites,
-		//nav_data_packet.bit.position_x,
-		//nav_data_packet.bit.position_y,
-		//nav_data_packet.bit.position_z,
-		//nav_data_packet.bit.velocity_x,
-		//nav_data_packet.bit.velocity_y,
-		//nav_data_packet.bit.velocity_z,
-		//nav_data_packet.bit.accel_x,
-		//nav_data_packet.bit.accel_y,
-		//nav_data_packet.bit.accel_z,
-		//nav_data_packet.bit.orientation_x,
-		//nav_data_packet.bit.orientation_y,
-		//nav_data_packet.bit.orientation_z,
-		//nav_data_packet.bit.pressure,
-		//nav_data_packet.bit.imu_temperature
-		//);
-		//
-		//serial_print(buffer);
+
 		
 		
 		// check for data request from computer
 		// MSB is one for requests to NAV computer
 		// zero for requests to the CTRL computer
 		if (SERCOM2->USART.INTFLAG.bit.RXC) {
-			uint8_t command = SERCOM2->USART.DATA.reg;
+			uint8_t command = SERIAL_REG;
 			
 			while(SERCOM2->USART.INTFLAG.bit.RXC) SERCOM2->USART.DATA.reg;
 			
+			
+			EEPROM_Read_Request eeprom_read_request;
+			CTRL_EEPROM_Read_packet ctrl_eeprom_read_packet;
+			EEPROM_Write_Request eeprom_write_request;
+			
 			switch (command) {
-					// test
+					// eeprom read
 				case 0x40:
+					// create data type
 					// set acknowledge response to ok
 					ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+					// set acknowledge packet crc
 					ctrl_ack_packet.bit.crc = gen_crc32((uint32_t) ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
 					// send acknowledge packet
 					serial_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
-					// wait for data return
-					while (!SERCOM2->USART.INTFLAG.bit.RXC);
-					// get data
-					uint8_t value = SERCOM2->USART.DATA.reg;
-					// print value
-					LED_print_8(value);
+					// wait for data request
+					serial_read(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+					
+					// check packet is valid
+					if (gen_crc32((uint32_t) eeprom_read_request.reg, sizeof(eeprom_read_request.reg)) == CRC32_CHECK &&
+						eeprom_read_request.bit.header == EEPROM_READ_REQUEST_HEADER) {
+						// get data from eeprom
+						ctrl_eeprom_read_packet.bit.device_id = DEVICE_ID;
+												
+						ctrl_eeprom_read_packet.bit.data = spi_eeprom_read_byte(eeprom_read_request.bit.address);
+							
+						ctrl_eeprom_read_packet.bit.status = 1;
+						ctrl_eeprom_read_packet.bit.crc = gen_crc32((uint32_t) ctrl_eeprom_read_packet.reg, sizeof(ctrl_eeprom_read_packet.reg));
+							
+						serial_stream(ctrl_eeprom_read_packet.reg, sizeof(ctrl_eeprom_read_packet.reg));
+					}
+					else {
+						REG_PORT_OUTSET1 = LED;
+						while(1);
+					}
+
+					break;
+				
+					// eeprom write	
+				case 0x41:
+					// set acknowledge response to ok
+					ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+					// set acknowledge packet crc
+					ctrl_ack_packet.bit.crc = gen_crc32((uint32_t) ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+					// send acknowledge packet
+					serial_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+					// wait for data request
+					serial_read(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+					
+					// check packet is valid
+					if (gen_crc32((uint32_t) eeprom_write_request.reg, sizeof(eeprom_write_request.reg)) == CRC32_CHECK &&
+						eeprom_write_request.bit.header == EEPROM_WRITE_REQUEST_HEADER) {
+						// write data to eeprom
+						spi_eeprom_write_enable();
+						spi_eeprom_write_byte(eeprom_write_request.bit.address, eeprom_write_request.bit.data);
+						spi_eeprom_write_disable();
+					}
+					else {
+						REG_PORT_OUTSET1 = LED;
+						while(1);
+					}
+					break;
+					
+					// flash read
+				case 0x42:
+					break;
+					
+					// flash write
+				case 0x43:
 					break;
 				
 					// case for nav self test
@@ -104,9 +129,9 @@ int main(void) {
 						nav_selftest_packet.reg[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
 					}
 						
-					if (gen_crc32((uint32_t) &nav_selftest_packet.reg[0], sizeof(nav_selftest_packet.reg)) != 0x2144df1c) {
+					if (gen_crc32((uint32_t) &nav_selftest_packet.reg[0], sizeof(nav_selftest_packet.reg)) != CRC32_CHECK) {
 						//serial_print("CRC Check Failed\n");
-						REG_PORT_OUTSET1 = (1 << 11);
+						REG_PORT_OUTSET1 = LED;
 					}
 				
 					serial_stream(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg));
@@ -162,7 +187,7 @@ uint8_t system_check() {
 		nav_selftest_packet.reg[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
 	}
 	
-	if (gen_crc32((uint32_t) &nav_selftest_packet.reg[0], sizeof(nav_selftest_packet.reg)) == 0x2144df1c) {
+	if (gen_crc32((uint32_t) &nav_selftest_packet.reg[0], sizeof(nav_selftest_packet.reg)) == CRC32_CHECK) {
 		serial_print("CRC Check Passed\n");
 	}
 	else {
@@ -208,6 +233,7 @@ void init() {
 	serial_init();
 	nav_uart_init();
 	spi_init();
+	spi_eeprom_init();
 	
 	// set LED to output
 	REG_PORT_DIRSET1 = LED;
@@ -216,7 +242,7 @@ void init() {
 	REG_PORT_DIRSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
 	REG_PORT_OUTSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
 	
-	//ctrl_ack_packet.bit.device_id = DEVICE_ID;
+	ctrl_ack_packet.bit.device_id = DEVICE_ID;
 	
 	
 	//serial_print("Embedded Navigation v0.0.2\nFinley Blaine 2021\n\n");
