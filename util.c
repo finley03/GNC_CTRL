@@ -28,14 +28,14 @@ void crc_init() {
 }
 
 
-uint32_t gen_crc32(uint32_t data_addr, uint32_t data_size) {
+uint32_t crc32(uint8_t* data, uint32_t data_size) {
 	*((volatile unsigned int*) 0x41007058) &= ~0x30000UL;
 	
 	// fill data register with starting value
 	//DSU->DATA.reg = 0xffffffff;
 	DSU->DATA.reg = 0xffffffff;
 	
-	DSU->ADDR.reg = data_addr;
+	DSU->ADDR.reg = (uint32_t) data;
 	DSU->LENGTH.reg = DSU_LENGTH_LENGTH((data_size / 4));
 	
 	// clear done bit

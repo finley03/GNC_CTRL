@@ -40,6 +40,7 @@ uint8_t spi_eeprom_read_status() {
 	spi_command(RDSR);
 	uint8_t out = spi_command(0);
 	REG_PORT_OUTSET0 = SPI_EEPROM_SS;
+	return out;
 }
 
 void spi_eeprom_write_status(uint8_t data) {

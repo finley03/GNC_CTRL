@@ -1,12 +1,15 @@
 #include "uart.h"
 
 
+void serial_flush() {
+	while(SERCOM2->USART.INTFLAG.bit.RXC) SERCOM2->USART.DATA.reg;
+}
+
 void serial_send(uint8_t data) {
 	while(!SERCOM2->USART.INTFLAG.bit.DRE);
 	
 	SERCOM2->USART.DATA.reg = data;
 }
-
 
 void serial_stream(uint8_t* addr, uint32_t nr_bytes) {
 	for (uint32_t i = 0; i < nr_bytes; ++i) {
@@ -14,14 +17,12 @@ void serial_stream(uint8_t* addr, uint32_t nr_bytes) {
 	}
 }
 
-
 void serial_print(char *addr) {
 	while(*addr != 0) {
 		serial_send(*addr);
 		++addr;
 	}
 }
-
 
 void serial_read(uint8_t* addr, uint32_t n) {
 	for (uint32_t i = 0; i < n; ++i) {
@@ -31,7 +32,6 @@ void serial_read(uint8_t* addr, uint32_t n) {
 		addr[i] = (uint8_t) (SERCOM2->USART.DATA.reg);
 	}
 }
-
 
 void serial_init() {
 	// uses SERCOM2 (PA08 - PA11)
@@ -193,9 +193,27 @@ void nav_uart_init() {
 	while(SERCOM0->USART.SYNCBUSY.bit.ENABLE);
 }
 
+void nav_flush() {
+	while(SERCOM0->USART.INTFLAG.bit.RXC) SERCOM0->USART.DATA.reg;
+}
 
 void nav_uart_send(uint8_t data) {
 	while(!SERCOM0->USART.INTFLAG.bit.DRE);
 	
 	SERCOM0->USART.DATA.reg = data;
+}
+
+void nav_stream(uint8_t* addr, uint32_t nr_bytes) {
+	for (uint32_t i = 0; i < nr_bytes; ++i) {
+		nav_uart_send(addr[i]);
+	}
+}
+
+void nav_read(uint8_t* addr, uint32_t n) {
+	for (uint32_t i = 0; i < n; ++i) {
+		// wait until data available
+		while(!SERCOM0->USART.INTFLAG.bit.RXC);
+		
+		addr[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
+	}
 }

@@ -1,8 +1,7 @@
+#ifndef MAIN_H
+#define MAIN_H
+
 #include "util.h"
-#include "spi_flash.h"
-#include "spi_eeprom.h"
-#include "uart.h"
-#include "spi.h"
 
 #define NAV_DEVICE_ID 0xd5d5
 #define DEVICE_ID 0xd6d6
@@ -99,6 +98,25 @@ typedef union __attribute__((aligned(4))) {
 } NAV_Selftest_Packet;
 
 
+#define TRANSFER_REQUEST_HEADER 0x0003
+
+// packet sent by computer to request transfer
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint16_t command;
+	
+	uint32_t crc;
+} Transfer_Request_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	Transfer_Request_Type bit;
+	
+	uint8_t reg[sizeof(Transfer_Request_Type)];
+} Transfer_Request;
+
+
 #define CTRL_ACK_OK 0x0000
 #define CTRL_ACK_ERROR 0xffff
 
@@ -172,3 +190,11 @@ typedef union __attribute__((aligned(4))) {
 	
 	uint8_t reg[sizeof(EEPROM_Write_Request_Type)];
 } EEPROM_Write_Request;
+
+
+
+extern volatile Transfer_Request transfer_request;
+
+
+
+#endif
