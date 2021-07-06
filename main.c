@@ -5,6 +5,7 @@
 #include "uart.h"
 #include "spi.h"
 #include "dma.h"
+#include "pwm.h"
 
 
 void init();
@@ -42,6 +43,10 @@ int main(void) {
 		}
 		REG_PORT_OUTCLR1 = LED;
 		
+		
+		pwm_write(PWM_WRITE_ALE, nav_data_packet.bit.orientation_x / 90);
+		pwm_write(PWM_WRITE_ELEV, nav_data_packet.bit.orientation_y / 90);
+		pwm_write(PWM_WRITE_RUDD, nav_data_packet.bit.orientation_z / 90);
 
 		
 		
@@ -181,78 +186,11 @@ int main(void) {
 }
 
 
-uint8_t system_check() {
-	uint8_t state = 0;
-	
-	serial_print("Starting System Check...\n");
-	
-	// check SPI flash
-	serial_print("SPI Flash...");
-	if (!spi_flash_checkid()) serial_print("OK\n");
-	else {
-		serial_print("FAIL\n");
-		state = 1;
-	}
-	
-	
-	// test navigation computer
-	
-	serial_print("Navigation computer test:\n");
-	
-	NAV_Selftest_Packet nav_selftest_packet;
-	
-	nav_uart_send(0x80);
-	
-	for (uint32_t i = 0; i < sizeof(nav_selftest_packet.reg); ++i) {
-		// wait until data available
-		while(!SERCOM0->USART.INTFLAG.bit.RXC);
-		
-		nav_selftest_packet.reg[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
-	}
-	
-	if (crc32(&nav_selftest_packet.reg[0], sizeof(nav_selftest_packet.reg)) == CRC32_CHECK) {
-		serial_print("CRC Check Passed\n");
-	}
-	else {
-		serial_print("CRC Check Failed\n");
-		state = 1;
-	}
-	
-	serial_print("NAV device ID...");
-	if (nav_selftest_packet.bit.device_id == NAV_DEVICE_ID) serial_print("OK\n");
-	else {
-		serial_print("FAIL\n");
-		state = 1;
-	}
-	
-	serial_print("NAV IMU...");
-	if (nav_selftest_packet.bit.imu_code == 0) serial_print("OK\n");
-	else {
-		serial_print("FAIL\n");
-		state = 1;
-	}
-	
-	serial_print("NAV Barometer...");
-	if (nav_selftest_packet.bit.baro_code == 0) serial_print("OK\n");
-	else {
-		serial_print("FAIL\n");
-		state = 1;
-	}
-	
-	
-	
-	
-	if (!state) serial_print("System Check Passed\n\n");
-	else serial_print("System Check Failed\n\n");
-	
-	return state;
-}
-
-
 void init() {
 	set_clock_48m();
 	crc_init();
-	delay_ms(100);
+	//delay_ms(100);
+	pwm_init_out();
 	serial_init();
 	nav_uart_init();
 	spi_init();
@@ -267,11 +205,7 @@ void init() {
 	
 	ctrl_ack_packet.bit.device_id = DEVICE_ID;
 	
-	
-	//serial_print("Embedded Navigation v0.0.2\nFinley Blaine 2021\n\n");
-	
 	delay_ms(1000);
-	//system_check();
 	
 	serial_rx_init_dma();
 }

@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//#define F_CPU 48000000
 #define LED PORT_PB11
 
 void LED_print_8(uint8_t data);
