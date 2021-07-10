@@ -193,7 +193,7 @@ typedef union __attribute__((aligned(4))) {
 
 
 
-extern volatile Transfer_Request transfer_request;
+extern Transfer_Request transfer_request;
 
 
 

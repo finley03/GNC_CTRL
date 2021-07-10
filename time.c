@@ -99,3 +99,46 @@ void delay_8c(uint32_t n) {
 	"	bne loop		\n" // if counter is not 0, loop
 	);
 }
+
+
+void init_timer() {
+	// never forget the bus clock
+	PM->APBCMASK.bit.TC4_ = 1;
+	
+	// pipe 48mhz clock to tc4/tc5 counters
+	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID_TC4_TC5;
+	while(GCLK->STATUS.bit.SYNCBUSY);
+	
+	// configure counters
+	TC4->COUNT32.CTRLA.reg = TC_CTRLA_MODE_COUNT32;
+	while(TC4->COUNT32.STATUS.bit.SYNCBUSY);
+	
+	// enable TC4
+	TC4->COUNT32.CTRLA.bit.ENABLE = 1;
+	while(TC4->COUNT32.STATUS.bit.SYNCBUSY);
+	
+	// enable continuous read
+	TC4->COUNT32.READREQ.reg = TC_READREQ_RCONT | TC_READREQ_ADDR(0x10);
+	while(TC4->COUNT32.STATUS.bit.SYNCBUSY);
+}
+
+
+void start_timer() {
+	TC4->COUNT32.CTRLBSET.reg = TC_CTRLBCLR_CMD_RETRIGGER;
+	while(TC4->COUNT32.STATUS.bit.SYNCBUSY);
+}
+
+
+uint32_t read_timer_20ns() {
+	return TC4->COUNT32.COUNT.reg;
+}
+
+
+float read_timer_ms() {
+	return (float) TC4->COUNT32.COUNT.reg * TIMER_MS_MULTIPLIER;
+}
+
+
+float read_timer_s() {
+	return (float) TC4->COUNT32.COUNT.reg * TIMER_S_MULTIPLIER;
+}

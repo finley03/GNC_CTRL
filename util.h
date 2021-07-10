@@ -3,6 +3,7 @@
 
 #include "samd21g18a.h"
 #include "time.h"
+#include "mat.h"
 
 #include <math.h>
 #include <stdlib.h>
