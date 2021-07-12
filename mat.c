@@ -62,6 +62,13 @@ int mat_multiply(float* matA, uint16_t Am, uint16_t An, float* matB, uint16_t Bm
 }
 
 
+void mat_element_multiply(float* matA, float* matB, uint32_t size, float* writeback) {
+	for (uint32_t i = 0; i < size; ++i) {
+		writeback[i] = matA[i] * matB[i];
+	}
+}
+
+
 void mat_transpose(float* mat, uint16_t m, uint16_t n, float* writeback) {
 	for (uint16_t i = 0; i < m; ++i) {
 		for (uint16_t j = 0; j < n; j++) {

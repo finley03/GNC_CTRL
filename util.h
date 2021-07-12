@@ -9,6 +9,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+typedef enum {
+	_PID_X,
+	_PID_Y,
+	_PID_Z
+} CTRL_Param;
+
 //#define F_CPU 48000000
 #define LED PORT_PB11
 

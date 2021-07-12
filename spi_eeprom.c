@@ -107,13 +107,18 @@ void spi_eeprom_write_n_s(uint32_t address, void* data, uint32_t n) {
 	uint32_t nr_pages = top_multiples - botton_multiples + 1;
 	uint32_t data_index = 0;
 	for (uint32_t i = 0; i < nr_pages; ++i) {
+		spi_eeprom_write_enable();
 		REG_PORT_OUTCLR0 = SPI_EEPROM_SS;
 		spi_command(WRITE);
 		spi_command((uint8_t)(address >> 8));
 		spi_command((uint8_t)address);
-		for (uint32_t j = 0; address <= top && j < EEPROM_PAGE_SIZE; ++address, ++j) {
+		for (uint32_t j = address % EEPROM_PAGE_SIZE; address <= top && j < EEPROM_PAGE_SIZE; ++j) {
 			spi_command(data8[data_index++]);
+			++address;
 		}
 		REG_PORT_OUTSET0 = SPI_EEPROM_SS;
+		// wait until write cycle is done
+		while (spi_eeprom_read_status() & RDY_MASK);
+		spi_eeprom_write_disable();
 	}
 }

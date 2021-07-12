@@ -155,6 +155,24 @@ typedef union __attribute__((aligned(4))) {
 } CTRL_EEPROM_Read_packet;
 
 
+typedef struct __attribute__((aligned(4))) {
+	uint16_t device_id;
+	
+	uint8_t status;
+	uint8_t nr_bytes;
+	uint8_t data[64];
+	
+	uint32_t crc;
+} CTRL_EEPROM_Read_N_Packet_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	CTRL_EEPROM_Read_N_Packet_Type bit;
+	
+	uint8_t reg[sizeof(CTRL_EEPROM_Read_N_Packet_Type)];
+} CTRL_EEPROM_Read_N_packet;
+
+
 #define EEPROM_READ_REQUEST_HEADER 0x0001
 
 typedef struct __attribute__((aligned(4))) {
@@ -171,6 +189,25 @@ typedef union __attribute__((aligned(4))) {
 	
 	uint8_t reg[sizeof(EEPROM_Read_Request_type)];
 } EEPROM_Read_Request;
+
+
+#define EEPROM_READ_N_REQUEST_HEADER 0x0004
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint8_t size;
+	uint32_t address;
+	
+	uint32_t crc;
+} EEPROM_Read_N_Request_type;
+
+
+typedef union __attribute__((aligned(4))) {
+	EEPROM_Read_N_Request_type bit;
+	
+	uint8_t reg[sizeof(EEPROM_Read_N_Request_type)];
+} EEPROM_Read_N_Request;
 
 
 #define EEPROM_WRITE_REQUEST_HEADER 0x0002
@@ -190,6 +227,45 @@ typedef union __attribute__((aligned(4))) {
 	
 	uint8_t reg[sizeof(EEPROM_Write_Request_Type)];
 } EEPROM_Write_Request;
+
+
+#define EEPROM_WRITE_N_REQUEST_HEADER 0x0005
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint8_t size;
+	uint32_t address;
+	uint8_t data[64];
+	
+	uint32_t crc;
+} EEPROM_Write_N_Request_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	EEPROM_Write_N_Request_Type bit;
+	
+	uint8_t reg[sizeof(EEPROM_Write_N_Request_Type)];
+} EEPROM_Write_N_Request;
+
+
+#define CTRL_SET_VEC3_HEADER 0x0006
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint16_t parameter; // cast from CTRL_Param
+	float data[3];
+	
+	uint32_t crc;
+} CTRL_Set_Vec3_Type;
+
+
+typedef union __attribute__((aligned(4))) {
+	CTRL_Set_Vec3_Type bit;
+	
+	uint8_t reg[sizeof(CTRL_Set_Vec3_Type)];
+} CTRL_Set_Vec3;
 
 
 

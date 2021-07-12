@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 int mat_multiply(float* matA, uint16_t Am, uint16_t An, float* matB, uint16_t Bm, uint16_t Bn, float* writeback);
+void mat_element_multiply(float* matA, float* matB, uint32_t size, float* writeback);
 
 void mat_transpose(float* mat, uint16_t m, uint16_t n, float* writeback);
 void mat_transpose_sm(float* mat, uint16_t n);
