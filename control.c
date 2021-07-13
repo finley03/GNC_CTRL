@@ -131,14 +131,16 @@ void control(float* set, float* measured) {
 	PID_values[0] = PID_X[1];
 	PID_values[1] = PID_Y[1];
 	PID_values[2] = PID_Z[1];
-	mat_element_multiply(integral, PID_values, 3, integral);
+	// as integral is static it cannot be written back to
+	float newIntegral[3];
+	mat_element_multiply(integral, PID_values, 3, newIntegral);
 	PID_values[0] = PID_X[2];
 	PID_values[1] = PID_Y[2];
 	PID_values[2] = PID_Z[2];
 	mat_element_multiply(derivative, PID_values, 3, derivative);
 	
 	mat_copy(proportional, 3, output);
-	mat_add(output, integral, 3, output);
+	mat_add(output, newIntegral, 3, output);
 	mat_add(output, derivative, 3, output);
 	
 	// reset previous error

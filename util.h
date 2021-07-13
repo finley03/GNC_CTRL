@@ -8,6 +8,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef enum {
 	_PID_X,
@@ -17,6 +18,19 @@ typedef enum {
 
 //#define F_CPU 48000000
 #define LED PORT_PB11
+
+#define ABS(a) ((a < 0) ? -a : a)
+#define MAX_2(a, b) ((a > b) ? a : b)
+#define MIN_2(a, b) ((b > a) ? a : b);
+#define MAX_3(a, b, c) (MAX_2(MAX_2(a, b), c))
+#define MIN_3(a, b, c) (MIN_2(MIN_2(a, b), c))
+#define UMAX_2(a, b) MAX_2(ABS(a), ABS(b))
+#define UMIN_2(a, b) MIN_2(ABS(a), ABS(b))
+#define UMAX_3(a, b, c) MAX_3(ABS(a), ABS(b), ABS(c))
+#define UMIN_3(a, b, c) MIN_3(ABS(a), ABS(b), ABS(c))
+
+#define pow(a, b) exp2(b * log2(a))
+#define powf(a, b) exp2f(b * log2f(a))
 
 void LED_print_8(uint8_t data);
 

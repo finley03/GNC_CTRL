@@ -7,6 +7,7 @@
 #include "dma.h"
 #include "pwm.h"
 #include "control.h"
+#include "guidance.h"
 
 
 void init();
@@ -61,8 +62,6 @@ void txc_nav_data() {
 		REG_PORT_OUTSET1 = LED;
 		while(1);
 	}
-	
-	nav_data_packet.bit.debug1 = sizeof(CTRL_Set_Vec3);
 }
 
 
@@ -234,13 +233,7 @@ void txc_serial_data() {
 				}
 				else {
 					REG_PORT_OUTSET1 = LED;
-					if (crc32(set_request.reg, sizeof(set_request.reg)) != CRC32_CHECK) {
-						delay_ms(2000);
-					}
-					if (set_request.bit.header != CTRL_SET_VEC3_HEADER) {
-						delay_ms(4000);
-					}
-					REG_PORT_OUTCLR1 = LED;
+					while(1);
 				}
 			}
 			break;
