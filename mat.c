@@ -276,6 +276,14 @@ void mat_crossp(float* mat1, float* mat2, float* writeback) {
 	writeback[2] = mat1[0] * mat2[1] - mat1[1] * mat2[0];
 }
 
+float mat_dotp(float* mat1, float* mat2, uint32_t size) {
+	float sum = 0;
+	for (uint32_t i = 0; i < size; ++i) {
+		sum += mat1[i] * mat2[i];
+	}
+	return sum;
+}
+
 
 void mat_2_normalize(float* mat, float* writeback) {
 	float scalar = 1 / sqrt(mat[0] * mat[0] + mat[1] * mat[1]);

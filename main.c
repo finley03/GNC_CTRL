@@ -32,6 +32,15 @@ int main(void) {
 
 	while(1) {
 		delay_ms(20);
+		static uint32_t previous_time = 0;
+		// get current time
+		uint32_t current_time = read_timer_20ns();
+		// calculate time difference
+		uint32_t delta_time = current_time - previous_time;
+		// reset previous time
+		previous_time = current_time;
+		// convert previous time to float
+		float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
 		REG_PORT_OUTSET1 = LED;
 		txc_nav_data();
@@ -41,6 +50,23 @@ int main(void) {
 		float measured_value[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
 		//float PID[3] = {2, 0.3, 0.2};
 		control(set_value, measured_value);
+		
+		float testfloat[3];
+		control_read_value(_PID_Z, testfloat);
+		static float position[3] = {0, -2, -2};
+		if (testfloat[0] < 0.5) {
+			float target_orientation[3];
+			float target_vector[3];
+			nav_data_packet.bit.debug1 = guidance(position, target_orientation, target_vector, &nav_data_packet.bit.debug2);
+			mat_scalar_product(target_vector, i_time, 3, target_vector);
+			mat_add(position, target_vector, 3, position);
+		}
+		
+		nav_data_packet.bit.position_x = position[0];
+		nav_data_packet.bit.position_y = position[1];
+		nav_data_packet.bit.position_z = position[2];
+		
+		
 		
 		txc_serial_data();
 		

@@ -28,6 +28,7 @@ void mat_LU_inverse_n(float* L, float* U, float* workingVector, uint16_t n, floa
 void mat_inverse_n(float* mat, uint16_t n, float* writeback);
 
 void mat_crossp(float* mat1, float* mat2, float* writeback);
+float mat_dotp(float* mat1, float* mat2, uint32_t size);
 
 void mat_2_normalize(float* mat, float* writeback);
 void mat_3_normalize(float* mat, float* writeback);

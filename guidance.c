@@ -36,8 +36,8 @@ typedef union {
 } Point;
 
 
-static Point origin;
-static Point target;
+Point origin;
+Point target;
 
 void guidance_set_origin(float* value) {
 	mat_copy(origin.bit, 3, value);
@@ -86,6 +86,11 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 		case POINT:
 			*address += 13;
 			break;
+			
+		default:
+			REG_PORT_OUTSET1 = LED;
+			while(1);
+			break;
 		}
 	}
 }
@@ -104,7 +109,7 @@ bool run_code(bool reset) {
 		address = 0;
 	}
 	
-	bool end = false;
+	bool notend = true;
 
 	bool run = true;
 	// code loop
@@ -133,7 +138,7 @@ bool run_code(bool reset) {
 		break;
 		case END:
 			run = false;
-			end = true;
+			notend = false;
 		break;
 		case FOR_VAR:
 		{
@@ -177,26 +182,31 @@ bool run_code(bool reset) {
 		break;
 		case WHILE:
 		{
-			stack[++stack_pointer] = 1;
+			stack[++stack_pointer] = (uint32_t) WHILE << 16;
 			stack[++stack_pointer] = address + 1;
 			++address;
 		}
 		break;
 		case WHILE_VAR:
 		{
-			stack[++stack_pointer] = (uint32_t) spi_eeprom_read_byte(address + 1);
+			stack[++stack_pointer] = (uint32_t) spi_eeprom_read_byte(address + 1) | (uint32_t) WHILE_VAR << 16;
 			stack[++stack_pointer] = address + 2;
 			address += 2;
 		}
 		break;
 		case ENDWHILE:
 		{
-			if (integers[stack[stack_pointer - 1]] != 0) {
-				address = stack[stack_pointer];
+			if (stack[stack_pointer - 1] >> 16 == WHILE_VAR) {
+				if (integers[stack[stack_pointer - 1]] != 0) {
+					address = stack[stack_pointer];
+				}
+				else {
+					stack_pointer -= 2;
+					++address;
+				}
 			}
 			else {
-				stack_pointer -= 2;
-				++address;
+				address = stack[stack_pointer];
 			}
 		}
 		break;
@@ -359,14 +369,64 @@ bool run_code(bool reset) {
 		default:
 			//printf("Unrecognised command %02X at address %08X\n", code[address], address);
 			++address;
+			REG_PORT_OUTSET1 = LED;
+			while(1);
 		break;
 		}
 	}
-	return end;
+	return notend;
 }
 
-void guidance(float* target_orientation, float* target_vector) {
-	float origin_target_vector[3];
-	mat_subtract(target.bit, 3, origin.bit);
+float guidance(float* position, float* target_orientation, float* target_vector, float* debug) {
+	// run read function once on init
+	static bool once = true;
+	if (once) {
+		run_code(false);
+		run_code(false);
+		once = false;
+	}
 	
+	// find vector from origin point to target point
+	float origin_target_vector[3];
+	mat_subtract(target.bit, origin.bit, 3, origin_target_vector);
+	
+	// find normal to plane located at target point
+	float target_plane_normal[3];
+	mat_3_normalize(origin_target_vector, target_plane_normal);
+	
+	float target_dotp_value = mat_dotp(target.bit, target_plane_normal, 3);
+	
+	// find distance from point to target plane
+	// negative when moving towards origin
+	float position_target_dotp_value = mat_dotp(position, target_plane_normal, 3);
+	
+	// if distance is less than 15 (> -15) get new point
+	if (position_target_dotp_value >= target_dotp_value) {
+		run_code(false);
+	}
+	
+	// offset from line for position
+	float offset_vector[3];
+	// vector from origin to current position
+	float origin_position_vector[3];
+	mat_subtract(position, origin.bit, 3, origin_position_vector);
+	// distance from origin to position when projected on to target line
+	float origin_position_projected = mat_dotp(origin_position_vector, target_plane_normal, 3);
+	// vector from origin to position projected onto target line
+	float origin_position_projected_vector[3];
+	mat_scalar_product(target_plane_normal, origin_position_projected, 3, origin_position_projected_vector);
+	// absolute location of position projected to line
+	float position_projected_vector[3];
+	mat_add(origin.bit, origin_position_projected_vector, 3, position_projected_vector);
+	// calculate offset vector
+	mat_subtract(position_projected_vector, position, 3, offset_vector);
+	
+	// scale offset vector to add to target vector
+	mat_scalar_product(offset_vector, 0.3, 3, offset_vector);
+	
+	// add to target plane normal to get target vector
+	mat_add(target_plane_normal, offset_vector, 3, target_vector);
+	
+	*debug = target_dotp_value;
+	return position_target_dotp_value;
 }
