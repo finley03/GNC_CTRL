@@ -99,6 +99,7 @@ void serial_init() {
 		
 		// select pins
 		.bit.PINMASK = (uint16_t)((PORT_PA10 | PORT_PA11))
+		//.bit.PINMASK = (uint16_t)((PORT_PA18 | PORT_PA19) >> 16)
 		
 	};
 	
@@ -112,6 +113,151 @@ void serial_init() {
 	while(SERCOM2->USART.SYNCBUSY.bit.ENABLE);
 }
 
+
+void wireless_flush() {
+	while(SERCOM1->USART.INTFLAG.bit.RXC) SERCOM1->USART.DATA.reg;
+}
+
+void wireless_send(uint8_t data) {
+	while(!SERCOM1->USART.INTFLAG.bit.DRE);
+	
+	SERCOM1->USART.DATA.reg = data;
+}
+
+void wireless_stream(uint8_t* addr, uint32_t nr_bytes) {
+	for (uint32_t i = 0; i < nr_bytes; ++i) {
+		wireless_send(addr[i]);
+	}
+	
+	char buffer[16];
+	sprintf(buffer, "Sent %d bytes\n", (int) nr_bytes);
+	serial_print(buffer);
+}
+
+void wireless_print(char *addr) {
+	while(*addr != 0) {
+		wireless_send(*addr);
+		++addr;
+	}
+}
+
+void wireless_read(uint8_t* addr, uint32_t n) {
+	for (uint32_t i = 0; i < n; ++i) {
+		// wait until data available
+		while(!SERCOM1->USART.INTFLAG.bit.RXC);
+		
+		addr[i] = (uint8_t) (SERCOM1->USART.DATA.reg);
+	}
+}
+
+void wireless_init() {
+	// uses SERCOM1 (PA16 - PA19)
+	
+	// provide bus clock to SERCOM1
+	PM->APBCMASK.bit.SERCOM1_ = 1;
+	
+	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_ID_SERCOM1_CORE;
+	
+	while(GCLK->STATUS.bit.SYNCBUSY);
+	
+	
+	SERCOM_USART_CTRLA_Type ctrla = {
+		// set to LSB first
+		.bit.DORD = 1,
+		
+		// set to asynchronous communication
+		.bit.CMODE = 0,
+		
+		// set no parity
+		.bit.FORM = 0,
+		
+		// set SERCOM PAD[3] to rx
+		.bit.RXPO = 3,
+		
+		// set PAD[2] to tx
+		.bit.TXPO = 1,
+		
+		// set internal clock
+		.bit.MODE = 1
+	};
+	
+	SERCOM1->USART.CTRLA.reg = ctrla.reg;
+	
+	
+	SERCOM_USART_CTRLB_Type ctrlb = {
+		// enable tx and rx
+		.bit.RXEN = 1,
+		.bit.TXEN = 1
+	};
+	
+	SERCOM1->USART.CTRLB.reg = ctrlb.reg;
+	
+	while(SERCOM1->USART.SYNCBUSY.bit.CTRLB);
+	
+	
+	// set baud to 115200
+	SERCOM1->USART.BAUD.reg = 63019; // 65326
+	
+	//// set baud to 921600
+	//SERCOM1->USART.BAUD.reg = 45403; // 45403
+	
+	
+	PORT_WRCONFIG_Type wrconfig = {
+		// upper 16 bits
+		.bit.HWSEL = 1,
+		
+		// enable update
+		.bit.WRPINCFG = 1,
+		
+		.bit.WRPMUX = 1,
+		
+		// pin multiplexing function C
+		.bit.PMUX = 2,
+		
+		// enable pin multiplexing
+		.bit.PMUXEN = 1,
+		
+		// select pins
+		.bit.PINMASK = (uint16_t)((PORT_PA18 | PORT_PA19) >> 16)
+		
+	};
+	
+	PORT->Group[0].WRCONFIG.reg = wrconfig.reg;
+	
+	
+	// enable USART
+	SERCOM1->USART.CTRLA.bit.ENABLE = 1;
+	
+	// wait for synchronisation
+	while(SERCOM1->USART.SYNCBUSY.bit.ENABLE);
+}
+
+
+
+void nav_flush() {
+	while(SERCOM0->USART.INTFLAG.bit.RXC) SERCOM0->USART.DATA.reg;
+}
+
+void nav_uart_send(uint8_t data) {
+	while(!SERCOM0->USART.INTFLAG.bit.DRE);
+	
+	SERCOM0->USART.DATA.reg = data;
+}
+
+void nav_stream(uint8_t* addr, uint32_t nr_bytes) {
+	for (uint32_t i = 0; i < nr_bytes; ++i) {
+		nav_uart_send(addr[i]);
+	}
+}
+
+void nav_read(uint8_t* addr, uint32_t n) {
+	for (uint32_t i = 0; i < n; ++i) {
+		// wait until data available
+		while(!SERCOM0->USART.INTFLAG.bit.RXC);
+		
+		addr[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
+	}
+}
 
 void nav_uart_init() {
 	// uses SERCOM0 (PA08 - PA11)
@@ -191,29 +337,4 @@ void nav_uart_init() {
 	
 	// wait for synchronisation
 	while(SERCOM0->USART.SYNCBUSY.bit.ENABLE);
-}
-
-void nav_flush() {
-	while(SERCOM0->USART.INTFLAG.bit.RXC) SERCOM0->USART.DATA.reg;
-}
-
-void nav_uart_send(uint8_t data) {
-	while(!SERCOM0->USART.INTFLAG.bit.DRE);
-	
-	SERCOM0->USART.DATA.reg = data;
-}
-
-void nav_stream(uint8_t* addr, uint32_t nr_bytes) {
-	for (uint32_t i = 0; i < nr_bytes; ++i) {
-		nav_uart_send(addr[i]);
-	}
-}
-
-void nav_read(uint8_t* addr, uint32_t n) {
-	for (uint32_t i = 0; i < n; ++i) {
-		// wait until data available
-		while(!SERCOM0->USART.INTFLAG.bit.RXC);
-		
-		addr[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
-	}
 }

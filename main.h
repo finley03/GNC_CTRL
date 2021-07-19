@@ -270,6 +270,7 @@ typedef union __attribute__((aligned(4))) {
 
 
 extern Transfer_Request transfer_request;
+extern Transfer_Request wireless_transfer_request;
 
 
 

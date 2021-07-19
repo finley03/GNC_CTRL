@@ -36,11 +36,11 @@ typedef union {
 } Point;
 
 
-Point origin;
-Point target;
+Point origin_point;
+Point target_point;
 
 void guidance_set_origin(float* value) {
-	mat_copy(origin.bit, 3, value);
+	mat_copy(origin_point.bit, 3, value);
 }
 
 void skip_to(uint32_t* address, uint8_t opcode) {
@@ -117,12 +117,12 @@ bool run_code(bool reset) {
 		switch (spi_eeprom_read_byte(address)) {
 		case POINT:
 		{
-			mat_copy(target.bit, 3, origin.bit);
+			mat_copy(target_point.bit, 3, origin_point.bit);
 			//for (uint8_t i = 0; i < 3; ++i) {
 				//origin.bit[i] = target.bit[i];
 			//}
 			for (uint8_t i = 0; i < 12; ++i) {
-				target.reg[i] = spi_eeprom_read_byte(++address);
+				target_point.reg[i] = spi_eeprom_read_byte(++address);
 			}
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
@@ -388,13 +388,13 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	
 	// find vector from origin point to target point
 	float origin_target_vector[3];
-	mat_subtract(target.bit, origin.bit, 3, origin_target_vector);
+	mat_subtract(target_point.bit, origin_point.bit, 3, origin_target_vector);
 	
 	// find normal to plane located at target point
 	float target_plane_normal[3];
 	mat_3_normalize(origin_target_vector, target_plane_normal);
 	
-	float target_dotp_value = mat_dotp(target.bit, target_plane_normal, 3);
+	float target_dotp_value = mat_dotp(target_point.bit, target_plane_normal, 3);
 	
 	// find distance from point to target plane
 	// negative when moving towards origin
@@ -409,7 +409,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	float offset_vector[3];
 	// vector from origin to current position
 	float origin_position_vector[3];
-	mat_subtract(position, origin.bit, 3, origin_position_vector);
+	mat_subtract(position, origin_point.bit, 3, origin_position_vector);
 	// distance from origin to position when projected on to target line
 	float origin_position_projected = mat_dotp(origin_position_vector, target_plane_normal, 3);
 	// vector from origin to position projected onto target line
@@ -417,7 +417,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	mat_scalar_product(target_plane_normal, origin_position_projected, 3, origin_position_projected_vector);
 	// absolute location of position projected to line
 	float position_projected_vector[3];
-	mat_add(origin.bit, origin_position_projected_vector, 3, position_projected_vector);
+	mat_add(origin_point.bit, origin_position_projected_vector, 3, position_projected_vector);
 	// calculate offset vector
 	mat_subtract(position_projected_vector, position, 3, offset_vector);
 	
@@ -426,6 +426,9 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	
 	// add to target plane normal to get target vector
 	mat_add(target_plane_normal, offset_vector, 3, target_vector);
+	
+	// normalize target vector
+	mat_3_normalize(target_vector, target_vector);
 	
 	*debug = target_dotp_value;
 	return position_target_dotp_value;

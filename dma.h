@@ -32,14 +32,21 @@ typedef struct __attribute__((aligned(16))) {
 } DMA_DESCRIPTOR_Type;
 
 
-volatile DMA_DESCRIPTOR_Type dma_descriptor[DMA_CHANNELS];
-DMA_DESCRIPTOR_Type dma_descriptor_writeback[DMA_CHANNELS];
+volatile DMA_DESCRIPTOR_Type dma_descriptor[DMA_CHANNELS] __attribute__ ((aligned (16)));
+DMA_DESCRIPTOR_Type dma_descriptor_writeback[DMA_CHANNELS] __attribute__ ((aligned (16)));
 
-// SERIAL RX on DMA channel 0
-#define SERIAL_RX_CHANNEL 0
+//// SERIAL RX on DMA channel 0
+//#define SERIAL_RX_CHANNEL 0
+//
+//void serial_rx_dma_start();
+//uint8_t serial_rx_dma_end();
+//void serial_rx_init_dma();
+//
+// WIRELESS RX on DMA channel 0
+#define WIRELESS_RX_CHANNEL 0
 
-void serial_rx_dma_start();
-uint8_t serial_rx_dma_end();
-void serial_rx_init_dma();
+void wireless_rx_dma_start();
+uint8_t wireless_rx_dma_end();
+void wireless_rx_init_dma();
 
 #endif
