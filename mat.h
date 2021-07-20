@@ -32,6 +32,7 @@ float mat_dotp(float* mat1, float* mat2, uint32_t size);
 
 void mat_2_normalize(float* mat, float* writeback);
 void mat_3_normalize(float* mat, float* writeback);
+float mat_3_length(float* mat);
 
 float poly_newton(float* coeff, uint16_t degree);
 
@@ -40,6 +41,8 @@ void mat_3_eigenvalues(float* mat, float* values);
 
 void mat_2_eigenvector(float* mat, float lambda, float* vector);
 void mat_3_eigenvector(float* mat, float lambda, float* vector);
+
+void vec_rotate_axis(float* vector, float* axis, float angle, float* writeback);
 
 
 #endif

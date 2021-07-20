@@ -64,15 +64,12 @@ int main(void) {
 			mat_add(position, target_vector, 3, position);
 		}
 		
-		//nav_data_packet.bit.position_x = position[0];
-		//nav_data_packet.bit.position_y = position[1];
-		//nav_data_packet.bit.position_z = position[2];
-		
+		nav_data_packet.bit.position_x = position[0];
+		nav_data_packet.bit.position_y = position[1];
+		nav_data_packet.bit.position_z = position[2];
 		
 		
 		txc_wireless_data();
-		//txc_serial_data();
-		//txc_wireless_data();
 		
 		
 	}

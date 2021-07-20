@@ -300,6 +300,10 @@ void mat_3_normalize(float* mat, float* writeback) {
 	writeback[2] = mat[2] * scalar;
 }
 
+float mat_3_length(float* mat) {
+	return sqrt(mat[0] * mat[0] + mat[1] * mat[1] + mat[2] * mat[2]);
+}
+
 
 // runs newton's method on given polynomial
 // must have degree of at least 1
@@ -397,4 +401,31 @@ void mat_3_eigenvector(float* mat, float lambda, float* vector) {
 	vector[2] = -(mat[1] * vector[1] + mat[0] - lambda) / mat[2];
 
 	mat_3_normalize(vector, vector);
+}
+
+
+// uses Rodrigues' rotation formula
+void vec_rotate_axis(float* vector, float* axis, float angle, float* writeback) {
+	float sinx = sin(angle);
+	float cosx = cos(angle);
+	
+	float axisnorm[3];
+	mat_3_normalize(axis, axisnorm);
+	
+	float term1[3];
+	mat_scalar_product(vector, cosx, 3, term1);
+	
+	float axis_cross_vector[3];
+	mat_crossp(axisnorm, vector, axis_cross_vector);
+	float term2[3];
+	mat_scalar_product(axis_cross_vector, sinx, 3, term2);
+	
+	float axis_dot_vector = mat_dotp(axisnorm, vector, 3);
+	float axis_axis_dot_vector[3];
+	mat_scalar_product(axisnorm, axis_dot_vector, 3, axis_axis_dot_vector);
+	float term3[3];
+	mat_scalar_product(axis_axis_dot_vector, 1 - cosx, 3, term3);
+	
+	mat_add(term1, term2, 3, writeback);
+	mat_add(writeback, term3, 3, writeback);
 }
