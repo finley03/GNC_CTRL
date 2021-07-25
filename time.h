@@ -10,6 +10,8 @@
 #define TIMER_MS_MULTIPLIER (1000.0f/F_CPU)
 #define TIMER_S_MULTIPLIER (1.0f/F_CPU)
 
+#define TIMER_REG (TC4->COUNT32.COUNT.reg)
+
 void set_clock_48m();
 
 

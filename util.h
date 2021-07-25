@@ -44,6 +44,10 @@ void crc_init();
 #define CRC32_CHECK 0x2144DF1C
 uint32_t crc32(uint8_t* data, uint32_t data_size);
 
+void sbinary8(char* buffer, uint8_t value);
+void sbinary16(char* buffer, uint16_t value);
+void sbinary32(char* buffer, uint32_t value);
+
 //float radians(float value);
 //float degrees(float value);
 

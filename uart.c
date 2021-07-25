@@ -129,9 +129,9 @@ void wireless_stream(uint8_t* addr, uint32_t nr_bytes) {
 		wireless_send(addr[i]);
 	}
 	
-	char buffer[16];
-	sprintf(buffer, "Sent %d bytes\n", (int) nr_bytes);
-	serial_print(buffer);
+	//char buffer[16];
+	//sprintf(buffer, "Sent %d bytes\n", (int) nr_bytes);
+	//serial_print(buffer);
 }
 
 void wireless_print(char *addr) {

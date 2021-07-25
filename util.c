@@ -53,3 +53,40 @@ uint32_t crc32(uint8_t* data, uint32_t data_size) {
 	
 	return out;
 }
+
+
+void sbinary8(char* buffer, uint8_t value) {
+	for (uint_fast8_t i = 0; i < 8; ++i) {
+		uint_fast8_t bit = value & 0x80;
+		
+		if (bit != 0) buffer[i] = '1';
+		else buffer[i] = '0';
+		
+		value <<= 1;
+	}
+	buffer[8] = '\0';
+}
+
+void sbinary16(char* buffer, uint16_t value) {
+	for (uint_fast8_t i = 0; i < 16; ++i) {
+		uint_fast8_t bit = value & 0x80;
+		
+		if (bit != 0) buffer[i] = '1';
+		else buffer[i] = '0';
+		
+		value <<= 1;
+	}
+	buffer[16] = '\0';
+}
+
+void sbinary32(char* buffer, uint32_t value) {
+	for (uint_fast8_t i = 0; i < 32; ++i) {
+		uint_fast8_t bit = value & 0x80;
+		
+		if (bit != 0) buffer[i] = '1';
+		else buffer[i] = '0';
+		
+		value <<= 1;
+	}
+	buffer[32] = '\0';
+}
