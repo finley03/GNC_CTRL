@@ -17,7 +17,7 @@ void txc_wireless_data();
 
 
 Transfer_Request transfer_request;
-Transfer_Request wireless_transfer_request;
+//Transfer_Request wireless_transfer_request;
 NAV_Data_Packet nav_data_packet;
 NAV_Selftest_Packet nav_selftest_packet;
 CTRL_ACK_Packet ctrl_ack_packet;
@@ -44,15 +44,17 @@ int main(void) {
 		// convert previous time to float
 		float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
+		
+		REG_PORT_OUTSET1 = LED;
+		txc_nav_data();
+		REG_PORT_OUTCLR1 = LED;
+		
+		
 		static float position[3] = {0, -2, -2};
 		
 		PWM_in pwm_in = pwm_read();
 		if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
 		else {
-			REG_PORT_OUTSET1 = LED;
-			txc_nav_data();
-			REG_PORT_OUTCLR1 = LED;
-		
 			float set_value[3] = {0, 0, 0};
 			float measured_value[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
 			//float PID[3] = {2, 0.3, 0.2};
@@ -98,7 +100,7 @@ void txc_wireless_data() {
 	// MSB is one for requests to NAV computer
 	// zero for requests to the CTRL computer
 	if (wireless_rx_dma_end()) {
-		REG_PORT_OUTSET1 = LED;
+		//REG_PORT_OUTSET1 = LED;
 		uint16_t command;
 		if (crc32(transfer_request.reg, sizeof(transfer_request.reg)) == CRC32_CHECK &&
 		transfer_request.bit.header == TRANSFER_REQUEST_HEADER) {
@@ -246,7 +248,7 @@ void txc_wireless_data() {
 			case 0x0044:
 			{
 				// create data type
-				CTRL_Set_Vec3 set_request;
+				Set_Vec3_Request set_request;
 				// set acknowledge response to ok
 				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
 				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
@@ -257,13 +259,50 @@ void txc_wireless_data() {
 				
 				// check packet is valid
 				if (crc32(set_request.reg, sizeof(set_request.reg)) == CRC32_CHECK &&
-				set_request.bit.header == CTRL_SET_VEC3_HEADER) {
+				set_request.bit.header == SET_VEC3_REQUEST_HEADER) {
 					control_set_value((CTRL_Param) set_request.bit.parameter, set_request.bit.data);
 				}
 				else {
 					REG_PORT_OUTSET1 = LED;
 					while(1);
 				}
+			}
+			break;
+			
+			// read vec3 parameter
+			case 0x0045:
+			{
+				
+			}
+			break;
+			
+			// save vec3 parameter
+			case 0x0046:
+			{
+				
+				
+			}
+			break;
+			
+			// set scalar parameter
+			case 0x0047:
+			{
+				
+				
+			}
+			break;
+			
+			// read scalar parameter
+			case 0x0048:
+			{
+				
+			}
+			break;
+			
+			// save scalar parameter
+			case 0x0049:
+			{
+				
 			}
 			break;
 			
@@ -304,7 +343,7 @@ void txc_wireless_data() {
 		
 		// restart DMA
 		wireless_rx_dma_start();
-		REG_PORT_OUTCLR1 = LED;
+		//REG_PORT_OUTCLR1 = LED;
 	}
 }
 

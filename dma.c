@@ -1,6 +1,9 @@
 #include "dma.h"
 
 
+extern Transfer_Request transfer_request;
+
+
 //void serial_rx_dma_start() {
 	//// select channel
 	//DMAC->CHID.reg = SERIAL_RX_CHANNEL;

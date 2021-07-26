@@ -14,7 +14,10 @@
 #define EEPROM_PID_X 0x1000
 #define EEPROM_PID_Y 0x100C
 #define EEPROM_PID_Z 0x1018
-#define EEPROM_PID_SIZE 12
+//#define EEPROM_PID_SIZE 12
+
+#define SCALAR_SIZE (sizeof(float))
+#define VEC3_SIZE (3 * sizeof(float))
 // 
 
 void spi_eeprom_init();

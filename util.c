@@ -1,4 +1,10 @@
 #include "util.h"
+#include "spi_eeprom.h"
+
+
+extern float PID_X[3];
+extern float PID_Y[3];
+extern float PID_Z[3];
 
 
 void LED_print_8(uint8_t data) {
@@ -89,4 +95,67 @@ void sbinary32(char* buffer, uint32_t value) {
 		value <<= 1;
 	}
 	buffer[32] = '\0';
+}
+
+
+void control_load_values() {
+	spi_eeprom_read_n(EEPROM_PID_X, PID_X, VEC3_SIZE);
+	spi_eeprom_read_n(EEPROM_PID_Y, PID_Y, VEC3_SIZE);
+	spi_eeprom_read_n(EEPROM_PID_Z, PID_Z, VEC3_SIZE);
+}
+
+void control_load_value(CTRL_Param parameter) {
+	switch (parameter) {
+		case _PID_X:
+		spi_eeprom_read_n(EEPROM_PID_X, PID_X, VEC3_SIZE);
+		break;
+		case _PID_Y:
+		spi_eeprom_read_n(EEPROM_PID_Y, PID_Y, VEC3_SIZE);
+		break;
+		case _PID_Z:
+		spi_eeprom_read_n(EEPROM_PID_Z, PID_Z, VEC3_SIZE);
+		break;
+	}
+}
+
+void control_save_value(CTRL_Param parameter) {
+	switch (parameter) {
+		case _PID_X:
+		spi_eeprom_write_n_s(EEPROM_PID_X, PID_X, VEC3_SIZE);
+		break;
+		case _PID_Y:
+		spi_eeprom_write_n_s(EEPROM_PID_Y, PID_Y, VEC3_SIZE);
+		break;
+		case _PID_Z:
+		spi_eeprom_write_n_s(EEPROM_PID_Z, PID_Z, VEC3_SIZE);
+		break;
+	}
+}
+
+void control_set_value(CTRL_Param parameter, float* value) {
+	switch (parameter) {
+		case _PID_X:
+		mat_copy(value, 3, PID_X);
+		break;
+		case _PID_Y:
+		mat_copy(value, 3, PID_Y);
+		break;
+		case _PID_Z:
+		mat_copy(value, 3, PID_Z);
+		break;
+	}
+}
+
+void control_read_value(CTRL_Param parameter, float* value) {
+	switch (parameter) {
+		case _PID_X:
+		mat_copy(PID_X, 3, value);
+		break;
+		case _PID_Y:
+		mat_copy(PID_Y, 3, value);
+		break;
+		case _PID_Z:
+		mat_copy(PID_Z, 3, value);
+		break;
+	}
 }

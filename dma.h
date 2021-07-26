@@ -3,7 +3,8 @@
 #ifndef DMA_H
 #define DMA_H
 
-#include "main.h"
+#include "util.h"
+//#include "main.h"
 #include "uart.h"
 
 #define DMA_CHANNELS 1

@@ -1,74 +1,11 @@
 #include "control.h"
 #include "pwm.h"
-#include "spi_eeprom.h"
+//#include "spi_eeprom.h"
 
 
-static float PID_X[3];
-static float PID_Y[3];
-static float PID_Z[3];
-
-
-void control_load_values() {
-	spi_eeprom_read_n(EEPROM_PID_X, PID_X, EEPROM_PID_SIZE);
-	spi_eeprom_read_n(EEPROM_PID_Y, PID_Y, EEPROM_PID_SIZE);
-	spi_eeprom_read_n(EEPROM_PID_Z, PID_Z, EEPROM_PID_SIZE);
-}
-
-void control_load_value(CTRL_Param parameter) {
-	switch (parameter) {
-		case _PID_X:
-		spi_eeprom_read_n(EEPROM_PID_X, PID_X, EEPROM_PID_SIZE);
-		break;
-		case _PID_Y:
-		spi_eeprom_read_n(EEPROM_PID_Y, PID_Y, EEPROM_PID_SIZE);
-		break;
-		case _PID_Z:
-		spi_eeprom_read_n(EEPROM_PID_Z, PID_Z, EEPROM_PID_SIZE);
-		break;
-	}
-}
-
-void control_save_value(CTRL_Param parameter) {
-	switch (parameter) {
-		case _PID_X:
-		spi_eeprom_write_n_s(EEPROM_PID_X, PID_X, EEPROM_PID_SIZE);
-		break;
-		case _PID_Y:
-		spi_eeprom_write_n_s(EEPROM_PID_Y, PID_Y, EEPROM_PID_SIZE);
-		break;
-		case _PID_Z:
-		spi_eeprom_write_n_s(EEPROM_PID_Z, PID_Z, EEPROM_PID_SIZE);
-		break;
-	}
-}
-
-void control_set_value(CTRL_Param parameter, float* value) {
-	switch (parameter) {
-		case _PID_X:
-		mat_copy(value, 3, PID_X);
-		break;
-		case _PID_Y:
-		mat_copy(value, 3, PID_Y);
-		break;
-		case _PID_Z:
-		mat_copy(value, 3, PID_Z);
-		break;
-	}
-}
-
-void control_read_value(CTRL_Param parameter, float* value) {
-	switch (parameter) {
-		case _PID_X:
-		mat_copy(PID_X, 3, value);
-		break;
-		case _PID_Y:
-		mat_copy(PID_Y, 3, value);
-		break;
-		case _PID_Z:
-		mat_copy(PID_Z, 3, value);
-		break;
-	}
-}
+float PID_X[3];
+float PID_Y[3];
+float PID_Z[3];
 
 
 void control(float* set, float* measured) {
