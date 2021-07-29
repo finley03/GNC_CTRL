@@ -13,13 +13,39 @@
 #define _STD_G 9.80665
 
 typedef enum {
+	_CTRL_PARAM_START = 0,
 	_PID_X,
 	_PID_Y,
-	_PID_Z
+	_PID_Z,
+	_X_MIX,
+	_Y_MIX,
+	_Z_MIX,
+	_POSITION_PID,
+	_WAYPOINT_THRESHOLD,
+	
+	_CTRL_VOLATILE_PARAM_START = 8192,
+	
+	_NAV_PARAM_START = 16384,
+	_KALMAN_POSITION_UNCERTAINTY,
+	_KALMAN_VELOCITY_UNCERTAINTY,
+	_KALMAN_ORIENTATION_UNCERTAINTY,
+	_KALMAN_ORIENTATION_MEASUREMENT_UNCERTAINTY,
+	_KALMAN_GNSS_HORIZONTAL_UNCERTAINTY_MUL,
+	_KALMAN_GNSS_VERTICAL_UNCERTAINTY_MUL,
+	_KALMAN_BARO_VARIANCE,
+	_KALMAN_ACCEL_VARIANCE,
+	_KALMAN_ANGULARVELOCITY_VARIANCE,
+	_KALMAN_GNSS_ZEROLAT,
+	_KALMAN_GNSS_ZEROLONG,
+	
+	_NAV_VOLATILE_PARAM_START = 24576,
+	_KALMAN_RUN
 } CTRL_Param;
 
 //#define F_CPU 48000000
 #define LED PORT_PB11
+#define LED_ON() (REG_PORT_OUTSET1 = LED);
+#define LED_OFF() (REG_PORT_OUTCLR1 = LED);
 
 #define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
@@ -52,8 +78,15 @@ void sbinary32(char* buffer, uint32_t value);
 void control_load_values();
 void control_load_value(CTRL_Param parameter);
 void control_save_value(CTRL_Param parameter);
+void control_write_value(CTRL_Param parameter, float* value);
+void control_read_eeprom(CTRL_Param parameter, float* value);
 void control_set_value(CTRL_Param parameter, float* value);
 void control_read_value(CTRL_Param parameter, float* value);
+
+void nav_set_vec3(CTRL_Param parameter, float* value);
+void nav_set_scalar(CTRL_Param parameter, float* value);
+void nav_read_vec3(CTRL_Param parameter, float* value);
+void nav_read_scalar(CTRL_Param parameter, float* value);
 
 
 #define NAV_DEVICE_ID 0xd5d5
@@ -74,6 +107,14 @@ typedef enum {
 	READ_SCALAR_REQUEST_HEADER,
 	SAVE_SCALAR_REQUEST_HEADER
 } RequestHeader;
+
+typedef enum {
+	NAV_REQUEST_HEADER_START,
+	NAV_SET_VEC3_REQUEST_HEADER,
+	NAV_READ_VEC3_REQUEST_HEADER,
+	NAV_SET_SCALAR_REQUEST_HEADER,
+	NAV_READ_SCALAR_REQUEST_HEADER
+} NAV_RequestHeader;
 
 
 // nav_data_packet
@@ -199,12 +240,30 @@ typedef struct __attribute__((aligned(4))) {
 	uint32_t crc;
 } CTRL_ACK_Packet_Type;
 
-
 typedef union __attribute__((aligned(4))) {
 	CTRL_ACK_Packet_Type bit;
 	
 	uint8_t reg[sizeof(CTRL_ACK_Packet_Type)];
 } CTRL_ACK_Packet;
+
+
+#define NAV_ACK_OK 0x0000
+#define NAV_ACK_ERROR 0xFFFF
+
+// packet returned to CTRL computer when more data is required to fulfill request
+typedef struct __attribute__((aligned(4))) {
+	uint16_t device_id;
+	
+	uint16_t status_code;
+	
+	uint32_t crc;
+} NAV_ACK_Packet_Type;
+
+typedef union __attribute__((aligned(4))) {
+	NAV_ACK_Packet_Type bit;
+	
+	uint8_t reg[sizeof(NAV_ACK_Packet_Type)];
+} NAV_ACK_Packet;
 
 
 typedef struct __attribute__((aligned(4))) {
@@ -358,13 +417,13 @@ typedef struct __attribute__((aligned(4))) {
 	float data[3];
 	
 	uint32_t crc;
-} CTRL_Read_Vec3_Type;
+} Read_Vec3_Response_Type;
 
 typedef union __attribute__((aligned(4))) {
-	CTRL_Read_Vec3_Type bit;
+	Read_Vec3_Response_Type bit;
 	
-	uint8_t reg[sizeof(CTRL_Read_Vec3_Type)];
-} CTRL_Read_Vec3;
+	uint8_t reg[sizeof(Read_Vec3_Response_Type)];
+} Read_Vec3_Response;
 
 
 typedef struct {
@@ -393,25 +452,40 @@ typedef struct __attribute__((aligned(4))) {
 
 
 typedef union __attribute__((aligned(4))) {
-	Save_Vec3_Request_Type bit;
+	Set_Scalar_Request_Type bit;
 	
-	uint8_t reg[sizeof(Save_Vec3_Request_Type)];
+	uint8_t reg[sizeof(Set_Scalar_Request_Type)];
 } Set_Scalar_Request;
 
 
 typedef struct __attribute__((aligned(4))) {
 	uint16_t device_id;
 	
-	float data[3];
+	float data;
 	
 	uint32_t crc;
-} CTRL_Read_Scalar_Type;
+} Read_Scalar_Response_Type;
 
 typedef union __attribute__((aligned(4))) {
-	CTRL_Read_Scalar_Type bit;
+	Read_Scalar_Response_Type bit;
 	
-	uint8_t reg[sizeof(CTRL_Read_Scalar_Type)];
-} CTRL_Read_Scalar;
+	uint8_t reg[sizeof(Read_Scalar_Response_Type)];
+} Read_Scalar_Response;
+
+
+typedef struct __attribute__((aligned(4))) {
+	uint16_t header;
+	
+	uint16_t parameter;
+	
+	uint32_t crc;
+} Read_Scalar_Request_Type;
+
+typedef union __attribute__((aligned(4))) {
+	Read_Scalar_Request_Type bit;
+	
+	uint8_t reg[sizeof(Read_Scalar_Request_Type)];
+} Read_Scalar_Request;
 
 
 typedef struct {

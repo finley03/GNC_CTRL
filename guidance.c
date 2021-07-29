@@ -36,12 +36,17 @@ typedef union {
 } Point;
 
 
+float position_pid[3];
+
+
 Point origin_point;
 Point target_point;
 Point previous_origin_point;
 float target_plane_normal[3];
 float target_line_point[3];
 float target_line_vector[3];
+
+float waypoint_threshold;
 
 void guidance_set_origin(float* value) {
 	mat_copy(origin_point.bit, 3, value);
@@ -420,7 +425,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 		mat_copy(position, 3, last_position);
 	}
 	
-	const float turn_distance = 1;
+	//const float waypoint_threshold = 1;
 	
 	// turn parameters
 	static float turn_center[3];
@@ -443,7 +448,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 		mat_copy(target_plane_normal, 3, target_line_vector);
 	
 		// if distance is less than 15 (> -15) get new point
-		if (position_target_dotp_value >= target_dotp_value - turn_distance) {
+		if (position_target_dotp_value >= target_dotp_value - waypoint_threshold) {
 			run_code(false);
 			turn = true;
 			
@@ -451,15 +456,15 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 			float waypoint_turn_start_vector[3];
 			mat_subtract(previous_origin_point.bit, origin_point.bit, 3, waypoint_turn_start_vector);
 			mat_3_normalize(waypoint_turn_start_vector, waypoint_turn_start_vector);
-			mat_scalar_product(waypoint_turn_start_vector, turn_distance, 3, waypoint_turn_start_vector);
+			mat_scalar_product(waypoint_turn_start_vector, waypoint_threshold, 3, waypoint_turn_start_vector);
 			
 			float waypoint_turn_end_vector[3];
 			mat_subtract(target_point.bit, origin_point.bit, 3, waypoint_turn_end_vector);
 			mat_3_normalize(waypoint_turn_end_vector, waypoint_turn_end_vector);
-			mat_scalar_product(waypoint_turn_end_vector, turn_distance, 3, waypoint_turn_end_vector);
+			mat_scalar_product(waypoint_turn_end_vector, waypoint_threshold, 3, waypoint_turn_end_vector);
 			
-			turn_angle = 180 - degrees(acos(mat_dotp(waypoint_turn_start_vector, waypoint_turn_end_vector, 3) / (turn_distance * turn_distance)));
-			float waypoint_turn_center_distance = turn_distance / sin(radians(turn_angle) / 2);
+			turn_angle = 180 - degrees(acos(mat_dotp(waypoint_turn_start_vector, waypoint_turn_end_vector, 3) / (waypoint_threshold * waypoint_threshold)));
+			float waypoint_turn_center_distance = waypoint_threshold / sin(radians(turn_angle) / 2);
 			
 			float waypoint_turn_center_vector[3];
 			mat_add(waypoint_turn_start_vector, waypoint_turn_end_vector, 3, waypoint_turn_center_vector);
@@ -473,7 +478,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 			// assign turn end
 			mat_add(origin_point.bit, waypoint_turn_end_vector, 3, turn_end);
 			// assign turn radius
-			turn_radius = turn_distance / tan(radians(turn_angle) / 2);
+			turn_radius = waypoint_threshold / tan(radians(turn_angle) / 2);
 			// assign turn axis unnormalized
 			mat_crossp(waypoint_turn_end_vector, waypoint_turn_start_vector, turn_axis);
 		}
@@ -533,7 +538,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	mat_subtract(position_projected_vector, position, 3, offset_vector);
 	
 	// scale offset vector to add to target vector
-	mat_scalar_product(offset_vector, 0.3, 3, offset_vector);
+	mat_scalar_product(offset_vector, position_pid[0], 3, offset_vector);
 	
 	// add to target plane normal to get target vector
 	mat_add(target_line_vector, offset_vector, 3, target_vector);

@@ -6,7 +6,16 @@
 float PID_X[3];
 float PID_Y[3];
 float PID_Z[3];
+float mix_mat[9];
 
+
+//void control_init() {
+	//const float init_mix_mat[9] = {
+		//1, 0, 0.3,
+		//0, 1, 0,
+		//-0.1, 0, 1,
+	//}
+//}
 
 void control(float* set, float* measured) {
 	static uint32_t previous_time = 0;
@@ -84,12 +93,12 @@ void control(float* set, float* measured) {
 	mat_copy(error, 3, previous_error);
 	
 	
-	// matrix to mix values across channels
-	float mix_mat[9] = {
-		1, 0, 0.3,
-		0, 1, 0,
-		-0.1, 0, 1
-	};
+	//// matrix to mix values across channels
+	//float mix_mat[9] = {
+		//1, 0, 0.3,
+		//0, 1, 0,
+		//-0.1, 0, 1
+	//};
 	
 	float mixed_output[3];
 	mat_multiply(mix_mat, 3, 3, output, 3, 1, mixed_output);
