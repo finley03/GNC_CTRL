@@ -1,10 +1,8 @@
 #include "mat.h"
-
-
 #include <math.h>
 
 
-#define ABS(a) ((a < 0) ? -a : a)
+#define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
 #define MAX_3(a, b, c) (MAX_2(MAX_2(a, b), c))
 #define UMAX_2(a, b) MAX_2(ABS(a), ABS(b))
@@ -285,14 +283,14 @@ float mat_dotp(float* mat1, float* mat2, uint32_t size) {
 }
 
 
-void mat_2_normalize(float* mat, float* writeback) {
+void vec_2_normalize(float* mat, float* writeback) {
 	float scalar = 1 / sqrt(mat[0] * mat[0] + mat[1] * mat[1]);
 
 	writeback[0] = mat[0] * scalar;
 	writeback[1] = mat[1] * scalar;
 }
 
-void mat_3_normalize(float* mat, float* writeback) {
+void vec_3_normalize(float* mat, float* writeback) {
 	float scalar = 1 / sqrt(mat[0] * mat[0] + mat[1] * mat[1] + mat[2] * mat[2]);
 	
 	writeback[0] = mat[0] * scalar;
@@ -300,7 +298,7 @@ void mat_3_normalize(float* mat, float* writeback) {
 	writeback[2] = mat[2] * scalar;
 }
 
-float mat_3_length(float* mat) {
+float vec_3_length(float* mat) {
 	return sqrt(mat[0] * mat[0] + mat[1] * mat[1] + mat[2] * mat[2]);
 }
 
@@ -383,7 +381,7 @@ void mat_3_eigenvalues(float* mat, float* values) {
 void mat_2_eigenvector(float* mat, float lambda, float* vector) {
 	vector[0] = 1;
 	vector[1] = -(mat[0] - lambda) / mat[1];
-	mat_2_normalize(vector, vector);
+	vec_2_normalize(vector, vector);
 }
 
 
@@ -400,7 +398,7 @@ void mat_3_eigenvector(float* mat, float lambda, float* vector) {
 	vector[1] = (bv2cv3 - (mat[2] / mat[5]) * elv2fv3) / (mat[1] - (mat[4] - lambda) * (mat[2] / mat[5]));
 	vector[2] = -(mat[1] * vector[1] + mat[0] - lambda) / mat[2];
 
-	mat_3_normalize(vector, vector);
+	vec_3_normalize(vector, vector);
 }
 
 
@@ -410,7 +408,7 @@ void vec_rotate_axis(float* vector, float* axis, float angle, float* writeback) 
 	float cosx = cos(angle);
 	
 	float axisnorm[3];
-	mat_3_normalize(axis, axisnorm);
+	vec_3_normalize(axis, axisnorm);
 	
 	float term1[3];
 	mat_scalar_product(vector, cosx, 3, term1);
@@ -428,4 +426,30 @@ void vec_rotate_axis(float* vector, float* axis, float angle, float* writeback) 
 	
 	mat_add(term1, term2, 3, writeback);
 	mat_add(writeback, term3, 3, writeback);
+}
+
+
+// angle between two 3d vectors
+float vec_3_angle(float* vec1, float* vec2) {
+	float dotp = mat_dotp(vec1, vec2, 3);
+	float vec1length = vec_3_length(vec1);
+	float vec2length = vec_3_length(vec2);
+	return acos(dotp / (vec1length * vec2length));
+}
+
+
+// vec1 is stationary vector
+// vec2 = measurement vector
+// ref = vector for sign reference
+float vec_3_angle_signed(float* vec1, float* vec2, float* ref) {
+	float dotp = mat_dotp(vec1, vec2, 3);
+	float vec1length = vec_3_length(vec1);
+	float vec2length = vec_3_length(vec2);
+	float angle = acos(dotp / (vec1length * vec2length));
+	float cross_vec[3];
+	mat_crossp(vec1, vec2, cross_vec);
+	if (mat_dotp(cross_vec, ref, 3) < 0) {
+		angle = -angle;
+	}
+	return angle;
 }

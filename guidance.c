@@ -48,6 +48,8 @@ float target_line_vector[3];
 
 float waypoint_threshold;
 
+static bool once;
+
 void guidance_set_origin(float* value) {
 	mat_copy(origin_point.bit, 3, value);
 }
@@ -136,7 +138,7 @@ bool run_code(bool reset) {
 			}
 			
 			mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
-			mat_3_normalize(target_plane_normal, target_plane_normal);
+			vec_3_normalize(target_plane_normal, target_plane_normal);
 			
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
@@ -391,7 +393,11 @@ bool run_code(bool reset) {
 	return notend;
 }
 
-float guidance(float* position, float* target_orientation, float* target_vector, float* debug) {
+void reset_guidance() {
+	once = true;
+}
+
+void guidance(float* position, float* target_orientation, float* target_vector) {
 	static uint32_t previous_time = 0;
 	// get current time
 	uint32_t current_time = read_timer_20ns();
@@ -402,12 +408,14 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	// convert previous time to float
 	float i_time = (float) delta_time * TIMER_S_MULTIPLIER;
 	
-	float ret = 0;
+	//float ret = 0;
 	
 	// run read function once on init
-	static bool once = true;
+	//static bool once = true;
 	if (once) {
+		// load first point
 		run_code(false);
+		// load second point
 		run_code(false);
 		once = false;
 	}
@@ -419,7 +427,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 		float path_length;
 		const float measurement_time = 5;
 		mat_subtract(position, last_position, 3, path_vector);
-		path_length = mat_3_length(path_vector);
+		path_length = vec_3_length(path_vector);
 		float velocity = path_length / i_time;
 		average_velocity = average_velocity + ((velocity - average_velocity) * i_time / measurement_time);
 		mat_copy(position, 3, last_position);
@@ -455,12 +463,12 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 			// assign turn parameters
 			float waypoint_turn_start_vector[3];
 			mat_subtract(previous_origin_point.bit, origin_point.bit, 3, waypoint_turn_start_vector);
-			mat_3_normalize(waypoint_turn_start_vector, waypoint_turn_start_vector);
+			vec_3_normalize(waypoint_turn_start_vector, waypoint_turn_start_vector);
 			mat_scalar_product(waypoint_turn_start_vector, waypoint_threshold, 3, waypoint_turn_start_vector);
 			
 			float waypoint_turn_end_vector[3];
 			mat_subtract(target_point.bit, origin_point.bit, 3, waypoint_turn_end_vector);
-			mat_3_normalize(waypoint_turn_end_vector, waypoint_turn_end_vector);
+			vec_3_normalize(waypoint_turn_end_vector, waypoint_turn_end_vector);
 			mat_scalar_product(waypoint_turn_end_vector, waypoint_threshold, 3, waypoint_turn_end_vector);
 			
 			turn_angle = 180 - degrees(acos(mat_dotp(waypoint_turn_start_vector, waypoint_turn_end_vector, 3) / (waypoint_threshold * waypoint_threshold)));
@@ -468,7 +476,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 			
 			float waypoint_turn_center_vector[3];
 			mat_add(waypoint_turn_start_vector, waypoint_turn_end_vector, 3, waypoint_turn_center_vector);
-			mat_3_normalize(waypoint_turn_center_vector, waypoint_turn_center_vector);
+			vec_3_normalize(waypoint_turn_center_vector, waypoint_turn_center_vector);
 			mat_scalar_product(waypoint_turn_center_vector, waypoint_turn_center_distance, 3, waypoint_turn_center_vector);
 			
 			// assign turn center
@@ -494,7 +502,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 		mat_subtract(turn_start, turn_center, 3, turn_center_start);
 		
 		// get angle round turn
-		float angle_round_turn = degrees(acos(mat_dotp(turn_center_start, turn_center_position, 3) / (turn_radius * mat_3_length(turn_center_position))));
+		float angle_round_turn = degrees(acos(mat_dotp(turn_center_start, turn_center_position, 3) / (turn_radius * vec_3_length(turn_center_position))));
 		
 		float target_angle;
 		if (angle_round_turn >= turn_angle - 1) {
@@ -506,7 +514,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 			// use rolling average velocity to calculate
 			target_angle = angle_round_turn + degrees(atan(average_velocity * i_time / turn_radius));
 		}
-		ret = 1;
+		//ret = 1;
 		
 		// calculate position vector of target line
 		float turn_center_target_point[3];
@@ -518,7 +526,7 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 		float turn_start_target_vector[3];
 		mat_subtract(origin_point.bit, turn_start, 3, turn_start_target_vector);
 		vec_rotate_axis(turn_start_target_vector, turn_axis, radians(target_angle), target_line_vector);
-		mat_3_normalize(target_line_vector, target_line_vector);
+		vec_3_normalize(target_line_vector, target_line_vector);
 	}
 	
 	
@@ -544,8 +552,18 @@ float guidance(float* position, float* target_orientation, float* target_vector,
 	mat_add(target_line_vector, offset_vector, 3, target_vector);
 	
 	// normalize target vector
-	mat_3_normalize(target_vector, target_vector);
+	vec_3_normalize(target_vector, target_vector);
 	
-	*debug = average_velocity;
-	return ret;
+	// calculate target orientation
+	float down_vector[3] = {0, 0, 1};
+	float east_vector[3] = {0, 1, 0};
+	float down_target_normal[3]; // local east
+	mat_crossp(down_vector, target_vector, down_target_normal);
+	vec_3_normalize(down_target_normal, down_target_normal);
+	// roll axis
+	target_orientation[0] = 0;
+	// pitch axis
+	target_orientation[1] = degrees(vec_3_angle(down_vector, target_vector)) - 90;
+	// yaw axis
+	target_orientation[2] = degrees(vec_3_angle_signed(east_vector, down_target_normal, down_vector));
 }

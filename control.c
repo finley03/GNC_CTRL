@@ -29,6 +29,14 @@ void control(float* set, float* measured) {
 	float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
 	
+	// correct values so orientation goes correct way
+	if (measured[0] > set[0] + 180) set[0] += 360;
+	if (measured[0] < set[0] - 180) set[0] -= 360;
+	
+	if (measured[2] > set[2] + 180) set[2] += 360;
+	if (measured[2] < set[2] - 180) set[2] -= 360;
+	
+	
 	// variable that stores the difference between set orientation and measured orientation
 	float world_error[3];
 	mat_subtract(set, measured, 3, world_error);

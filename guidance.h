@@ -5,6 +5,7 @@
 
 void guidance_set_origin(float* value);
 
-float guidance(float* position, float* target_orientation, float* target_vector, float* debug);
+void reset_guidance();
+void guidance(float* position, float* target_orientation, float* target_vector);
 
 #endif

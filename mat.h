@@ -30,9 +30,9 @@ void mat_inverse_n(float* mat, uint16_t n, float* writeback);
 void mat_crossp(float* mat1, float* mat2, float* writeback);
 float mat_dotp(float* mat1, float* mat2, uint32_t size);
 
-void mat_2_normalize(float* mat, float* writeback);
-void mat_3_normalize(float* mat, float* writeback);
-float mat_3_length(float* mat);
+void vec_2_normalize(float* mat, float* writeback);
+void vec_3_normalize(float* mat, float* writeback);
+float vec_3_length(float* mat);
 
 float poly_newton(float* coeff, uint16_t degree);
 
@@ -43,6 +43,8 @@ void mat_2_eigenvector(float* mat, float lambda, float* vector);
 void mat_3_eigenvector(float* mat, float lambda, float* vector);
 
 void vec_rotate_axis(float* vector, float* axis, float angle, float* writeback);
+float vec_3_angle(float* vec1, float* vec2);
+float vec_3_angle_signed(float* vec1, float* vec2, float* ref);
 
 
 #endif
