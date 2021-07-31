@@ -23,6 +23,7 @@ NAV_Selftest_Packet nav_selftest_packet;
 CTRL_ACK_Packet ctrl_ack_packet;
 
 bool nav_poll;
+bool guidance_run;
 
 
 int main(void) {
@@ -63,9 +64,7 @@ int main(void) {
 		else {
 			static float target_orientation[3] = {0, 0, 0};
 			
-			float testfloat[3];
-			control_read_value(_PID_Y, testfloat);
-			if (testfloat[0] < 0.5) {
+			if (guidance_run) {
 				//float target_orientation[3];
 				float target_vector[3];
 				guidance(position, target_orientation, target_vector);
@@ -136,6 +135,16 @@ void txc_wireless_data() {
 			// reset guidance
 			case 0x0002:
 			reset_guidance();
+			break;
+			
+			// start guidance
+			case 0x0003:
+			guidance_run = true;
+			break;
+			
+			// stop guidance;
+			case 0x0004:
+			guidance_run = false;
 			break;
 			
 			// eeprom read byte
@@ -284,18 +293,6 @@ void txc_wireless_data() {
 				if (crc32(set_request.reg, sizeof(set_request.reg)) == CRC32_CHECK &&
 					set_request.bit.header == SET_VEC3_REQUEST_HEADER) {
 					if (set_request.bit.parameter > _NAV_PARAM_START) {
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x82);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//set_request.bit.header = NAV_SET_VEC3_REQUEST_HEADER;
-							//set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
-							//nav_stream(set_request.reg, sizeof(set_request.reg));
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						nav_set_vec3((CTRL_Param) set_request.bit.parameter, set_request.bit.data);
 					}
 					else {
@@ -325,20 +322,6 @@ void txc_wireless_data() {
 					Read_Vec3_Response read_packet;
 					read_packet.bit.device_id = DEVICE_ID;
 					if (read_request.bit.parameter > _NAV_PARAM_START) {
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x83);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//read_request.bit.header = NAV_READ_VEC3_REQUEST_HEADER;
-							//read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
-							//nav_stream(read_request.reg, sizeof(read_request.reg));
-							//nav_read(read_packet.reg, sizeof(read_packet.reg));
-							//read_packet.bit.device_id = DEVICE_ID;
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						nav_read_vec3((CTRL_Param) read_request.bit.parameter, read_packet.bit.data);
 					}
 					else {
@@ -372,23 +355,6 @@ void txc_wireless_data() {
 				save_request.bit.header == SAVE_VEC3_REQUEST_HEADER) {
 					//control_save_value((CTRL_Param) save_request.bit.parameter);
 					if (save_request.bit.parameter > _NAV_PARAM_START) {
-						//Read_Vec3_Response read_packet;
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x83);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//Read_Vec3_Request read_request;
-							//read_request.bit.header = NAV_READ_VEC3_REQUEST_HEADER;
-							//read_request.bit.parameter = save_request.bit.parameter;
-							//read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
-							//nav_stream(read_request.reg, sizeof(read_request.reg));
-							//nav_read(read_packet.reg, sizeof(read_packet.reg));
-							//control_write_value(save_request.bit.parameter, read_packet.bit.data);
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						float value[3];
 						nav_read_vec3((CTRL_Param) save_request.bit.parameter, value);
 						control_write_value((CTRL_Param) save_request.bit.parameter, value);
@@ -419,18 +385,6 @@ void txc_wireless_data() {
 				if (crc32(set_request.reg, sizeof(set_request.reg)) == CRC32_CHECK &&
 				set_request.bit.header == SET_SCALAR_REQUEST_HEADER) {
 					if (set_request.bit.parameter > _NAV_PARAM_START) {
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x84);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//set_request.bit.header = NAV_SET_SCALAR_REQUEST_HEADER;
-							//set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
-							//nav_stream(set_request.reg, sizeof(set_request.reg));
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						nav_set_scalar((CTRL_Param) set_request.bit.parameter, &set_request.bit.data);
 					}
 					else {
@@ -465,20 +419,6 @@ void txc_wireless_data() {
 					Read_Scalar_Response read_packet;
 					read_packet.bit.device_id = DEVICE_ID;
 					if (read_request.bit.parameter > _NAV_PARAM_START) {
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x85);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//read_request.bit.header = NAV_READ_SCALAR_REQUEST_HEADER;
-							//read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
-							//nav_stream(read_request.reg, sizeof(read_request.reg));
-							//nav_read(read_packet.reg, sizeof(read_packet.reg));
-							//read_packet.bit.device_id = DEVICE_ID;
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						nav_read_scalar((CTRL_Param) read_request.bit.parameter, &read_packet.bit.data);
 					}
 					else {
@@ -512,23 +452,6 @@ void txc_wireless_data() {
 				save_request.bit.header == SAVE_SCALAR_REQUEST_HEADER) {
 					////control_save_value((CTRL_Param) save_request.bit.parameter);
 					if (save_request.bit.parameter > _NAV_PARAM_START) {
-						//Read_Scalar_Response read_packet;
-						//NAV_ACK_Packet nav_ack_packet;
-						//nav_uart_send(0x85);
-						//nav_read(nav_ack_packet.reg, sizeof(nav_ack_packet.reg));
-						//if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
-							//Read_Scalar_Request read_request;
-							//read_request.bit.header = NAV_READ_SCALAR_REQUEST_HEADER;
-							//read_request.bit.parameter = save_request.bit.parameter;
-							//read_request.bit.crc = crc32(read_request.reg, sizeof(read_request.reg) - 4);
-							//nav_stream(read_request.reg, sizeof(read_request.reg));
-							//nav_read(read_packet.reg, sizeof(read_packet.reg));
-							//control_write_value(save_request.bit.parameter, &read_packet.bit.data);
-						//}
-						//else {
-							//LED_ON();
-							//while(1);
-						//}
 						float value;
 						nav_read_scalar((CTRL_Param) save_request.bit.parameter, &value);
 						control_write_value((CTRL_Param) save_request.bit.parameter, &value);
@@ -595,6 +518,14 @@ void txc_wireless_data() {
 			nav_uart_send(0x88);
 			break;
 			
+			// save magnetometer calibration
+			case 0x0085:
+			nav_save_vec3(_MAG_A_1);
+			nav_save_vec3(_MAG_A_2);
+			nav_save_vec3(_MAG_A_3);
+			nav_save_vec3(_MAG_B);
+			break;
+			
 			// nav computer reset
 			case 0x00FF:
 			nav_uart_send(0xFF);
@@ -647,4 +578,5 @@ void init() {
 	reset_guidance();
 	
 	nav_poll = true;
+	guidance_run = false;
 }

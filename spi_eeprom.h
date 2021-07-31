@@ -33,6 +33,12 @@
 #define EEPROM_KALMAN_ANGULARVELOCITY_VARIANCE 0x1838 // scalar
 #define EEPROM_KALMAN_GNSS_ZEROLAT 0x183C // scalar
 #define EEPROM_KALMAN_GNSS_ZEROLONG 0x1840 // scalar
+#define EEPROM_MAG_A_1 0x1844 // vec3
+#define EEPROM_MAG_A_2 0x1850 // vec3
+#define EEPROM_MAG_A_3 0x185C // vec3
+#define EEPROM_MAG_B 0x1868 // vec3
+#define EEPROM_ACCEL_B 0x1874 // vec3
+#define EEPROM_GYRO_B 0x1880 // vec3
 
 
 #define SCALAR_SIZE (sizeof(float))

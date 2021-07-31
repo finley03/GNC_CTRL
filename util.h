@@ -37,9 +37,14 @@ typedef enum {
 	_KALMAN_ANGULARVELOCITY_VARIANCE,
 	_KALMAN_GNSS_ZEROLAT,
 	_KALMAN_GNSS_ZEROLONG,
+	_MAG_A_1, // mag distortion matrix
+	_MAG_A_2,
+	_MAG_A_3,
+	_MAG_B, // mag offset vector
+	_ACCEL_B, // accel offset vector
+	_GYRO_B, // gyro offset vector
 	
-	_NAV_VOLATILE_PARAM_START = 24576,
-	//_KALMAN_RUN
+	_NAV_VOLATILE_PARAM_START = 24576
 } CTRL_Param;
 
 //#define F_CPU 48000000
@@ -87,6 +92,10 @@ void nav_set_vec3(CTRL_Param parameter, float* value);
 void nav_set_scalar(CTRL_Param parameter, float* value);
 void nav_read_vec3(CTRL_Param parameter, float* value);
 void nav_read_scalar(CTRL_Param parameter, float* value);
+void nav_load_vec3(CTRL_Param parameter);
+void nav_load_scalar(CTRL_Param parameter);
+void nav_save_vec3(CTRL_Param parameter);
+void nav_save_scalar(CTRL_Param parameter);
 
 
 #define NAV_DEVICE_ID 0xd5d5

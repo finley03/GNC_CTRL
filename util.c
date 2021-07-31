@@ -113,15 +113,19 @@ void nav_load_scalar(CTRL_Param parameter) {
 	nav_set_scalar(parameter, &value);
 }
 
+void nav_save_vec3(CTRL_Param parameter) {
+	float value[3];
+	nav_read_vec3(parameter, value);
+	control_write_value(parameter, value);
+}
+
+void nav_save_scalar(CTRL_Param parameter) {
+	float value;
+	nav_read_scalar(parameter, &value);
+	control_write_value(parameter, &value);
+}
+
 void control_load_values() {
-	//spi_eeprom_read_n(EEPROM_PID_X, PID_X, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_PID_Y, PID_Y, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_PID_Z, PID_Z, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_X_MIX, mix_mat, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_Y_MIX, mix_mat + 3, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_Z_MIX, mix_mat + 6, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_POSITION_PID, position_pid, VEC3_SIZE);
-	//spi_eeprom_read_n(EEPROM_WAYPOINT_THRESHOLD, &waypoint_threshold, SCALAR_SIZE);
 	control_load_value(_PID_X);
 	control_load_value(_PID_Y);
 	control_load_value(_PID_Z);
@@ -141,6 +145,12 @@ void control_load_values() {
 	nav_load_scalar(_KALMAN_ANGULARVELOCITY_VARIANCE);
 	nav_load_scalar(_KALMAN_GNSS_ZEROLAT);
 	nav_load_scalar(_KALMAN_GNSS_ZEROLONG);
+	nav_load_vec3(_MAG_A_1);
+	nav_load_vec3(_MAG_A_2);
+	nav_load_vec3(_MAG_A_3);
+	nav_load_vec3(_MAG_B);
+	nav_load_vec3(_ACCEL_B);
+	nav_load_vec3(_GYRO_B);
 }
 
 void control_load_value(CTRL_Param parameter) {
@@ -240,6 +250,24 @@ void control_write_value(CTRL_Param parameter, float* value) {
 		case _KALMAN_GNSS_ZEROLONG:
 		spi_eeprom_write_n_s(EEPROM_KALMAN_GNSS_ZEROLONG, value, SCALAR_SIZE);
 		break;
+		case _MAG_A_1:
+		spi_eeprom_write_n_s(EEPROM_MAG_A_1, value, VEC3_SIZE);
+		break;
+		case _MAG_A_2:
+		spi_eeprom_write_n_s(EEPROM_MAG_A_2, value, VEC3_SIZE);
+		break;
+		case _MAG_A_3:
+		spi_eeprom_write_n_s(EEPROM_MAG_A_3, value, VEC3_SIZE);
+		break;
+		case _MAG_B:
+		spi_eeprom_write_n_s(EEPROM_MAG_B, value, VEC3_SIZE);
+		break;
+		case _ACCEL_B:
+		spi_eeprom_write_n_s(EEPROM_ACCEL_B, value, VEC3_SIZE);
+		break;
+		case _GYRO_B:
+		spi_eeprom_write_n_s(EEPROM_GYRO_B, value, VEC3_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -279,6 +307,24 @@ void control_read_eeprom(CTRL_Param parameter, float* value) {
 		break;
 		case _KALMAN_GNSS_ZEROLONG:
 		spi_eeprom_read_n(EEPROM_KALMAN_GNSS_ZEROLONG, value, SCALAR_SIZE);
+		break;
+		case _MAG_A_1:
+		spi_eeprom_read_n(EEPROM_MAG_A_1, value, VEC3_SIZE);
+		break;
+		case _MAG_A_2:
+		spi_eeprom_read_n(EEPROM_MAG_A_2, value, VEC3_SIZE);
+		break;
+		case _MAG_A_3:
+		spi_eeprom_read_n(EEPROM_MAG_A_3, value, VEC3_SIZE);
+		break;
+		case _MAG_B:
+		spi_eeprom_read_n(EEPROM_MAG_B, value, VEC3_SIZE);
+		break;
+		case _ACCEL_B:
+		spi_eeprom_read_n(EEPROM_ACCEL_B, value, VEC3_SIZE);
+		break;
+		case _GYRO_B:
+		spi_eeprom_read_n(EEPROM_GYRO_B, value, VEC3_SIZE);
 		break;
 		default:
 		break;
