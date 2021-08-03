@@ -7,6 +7,9 @@ float PID_X[3];
 float PID_Y[3];
 float PID_Z[3];
 float mix_mat[9];
+float thro_config[3];
+
+extern bool arm;
 
 
 //void control_init() {
@@ -100,7 +103,9 @@ void control(float* set, float* measured) {
 	// reset previous error
 	mat_copy(error, 3, previous_error);
 	
-	
+	// calculate throttle
+	float thro = thro_config[0] * 2 - 1;
+	thro += thro_config[1] * set[1] / 90;
 	//// matrix to mix values across channels
 	//float mix_mat[9] = {
 		//1, 0, 0.3,
@@ -115,6 +120,6 @@ void control(float* set, float* measured) {
 	pwm_write(PWM_WRITE_ALE, mixed_output[0] / 90);
 	pwm_write(PWM_WRITE_ELEV, mixed_output[1] / 90);
 	pwm_write(PWM_WRITE_RUDD, mixed_output[2] / 90);
-	
-	
+	if (arm) pwm_write(PWM_WRITE_THRO, thro);
+	else pwm_write(PWM_WRITE_THRO, -1);
 }

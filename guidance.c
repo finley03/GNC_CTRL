@@ -409,15 +409,18 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 	float i_time = (float) delta_time * TIMER_S_MULTIPLIER;
 	
 	//float ret = 0;
+	// true if craft is turning to new way point
+	static bool turn = false;
 	
 	// run read function once on init
 	//static bool once = true;
 	if (once) {
 		// load first point
-		run_code(false);
+		run_code(true);
 		// load second point
 		run_code(false);
 		once = false;
+		turn = false;
 	}
 	
 	static float average_velocity = 0;
@@ -442,8 +445,9 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 	static float turn_angle;
 	static float turn_radius;
 	static float turn_axis[3];
-	// true if craft is turning to new way point
-	static bool turn = false;
+	
+	float roll_angle;
+	
 	// if not turning continuously check whether craft has reached way point
 	if (!turn) {
 		float target_dotp_value = mat_dotp(target_point.bit, target_plane_normal, 3);
@@ -454,6 +458,8 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 		
 		mat_copy(origin_point.bit, 3, target_line_point);
 		mat_copy(target_plane_normal, 3, target_line_vector);
+		
+		roll_angle = 0;
 	
 		// if distance is less than 15 (> -15) get new point
 		if (position_target_dotp_value >= target_dotp_value - waypoint_threshold) {
@@ -527,6 +533,15 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 		mat_subtract(origin_point.bit, turn_start, 3, turn_start_target_vector);
 		vec_rotate_axis(turn_start_target_vector, turn_axis, radians(target_angle), target_line_vector);
 		vec_3_normalize(target_line_vector, target_line_vector);
+		
+		// calculate roll angle
+		// down vector
+		static float down[3] = {0, 0, 1};
+		// horizontal acceleration
+		float horizontal_accel = (average_velocity * average_velocity) / turn_radius;
+		horizontal_accel = (mat_dotp(down, turn_axis, 3) >= 0) ? horizontal_accel : -horizontal_accel;
+		// calculate roll angle
+		roll_angle = degrees(atan(horizontal_accel / _STD_G));
 	}
 	
 	
@@ -561,7 +576,7 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 	mat_crossp(down_vector, target_vector, down_target_normal);
 	vec_3_normalize(down_target_normal, down_target_normal);
 	// roll axis
-	target_orientation[0] = 0;
+	target_orientation[0] = roll_angle;
 	// pitch axis
 	target_orientation[1] = degrees(vec_3_angle(down_vector, target_vector)) - 90;
 	// yaw axis

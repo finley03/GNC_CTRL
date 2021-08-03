@@ -19,6 +19,7 @@
 #define EEPROM_Z_MIX 0x103C // vec3
 #define EEPROM_POSITION_PID 0x1048 // vec3
 #define EEPROM_WAYPOINT_THRESHOLD 0x1054 // scalar
+#define EEPROM_THRO_CONFIG 0x1058 // vec3 (zero, proportional pitch, reserved)
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 

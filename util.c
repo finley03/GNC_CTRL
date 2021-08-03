@@ -9,6 +9,7 @@ extern float PID_Z[3];
 extern float mix_mat[9];
 extern float position_pid[3];
 extern float waypoint_threshold;
+extern float thro_config[3];
 
 
 void LED_print_8(uint8_t data) {
@@ -134,6 +135,7 @@ void control_load_values() {
 	control_load_value(_Z_MIX);
 	control_load_value(_POSITION_PID);
 	control_load_value(_WAYPOINT_THRESHOLD);
+	control_load_value(_THRO_CONFIG);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -179,6 +181,9 @@ void control_load_value(CTRL_Param parameter) {
 		case _WAYPOINT_THRESHOLD:
 		spi_eeprom_read_n(EEPROM_WAYPOINT_THRESHOLD, &waypoint_threshold, SCALAR_SIZE);
 		break;
+		case _THRO_CONFIG:
+		spi_eeprom_read_n(EEPROM_THRO_CONFIG, &thro_config, VEC3_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -209,6 +214,9 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _WAYPOINT_THRESHOLD:
 		spi_eeprom_write_n_s(EEPROM_WAYPOINT_THRESHOLD, &waypoint_threshold, SCALAR_SIZE);
+		break;
+		case _THRO_CONFIG:
+		spi_eeprom_write_n_s(EEPROM_THRO_CONFIG, &thro_config, VEC3_SIZE);
 		break;
 		default:
 		break;
@@ -357,6 +365,9 @@ void control_set_value(CTRL_Param parameter, float* value) {
 		case _WAYPOINT_THRESHOLD:
 		waypoint_threshold = *value;
 		break;
+		case _THRO_CONFIG:
+		mat_copy(value, 3, thro_config);
+		break;
 		default:
 		break;
 	}
@@ -388,6 +399,9 @@ void control_read_value(CTRL_Param parameter, float* value) {
 		case _WAYPOINT_THRESHOLD:
 		*value = waypoint_threshold;
 		break;
+		case _THRO_CONFIG:
+		mat_copy(thro_config, 3, value);
+		break;
 		default:
 		break;
 	}
@@ -401,6 +415,7 @@ void nav_set_vec3(CTRL_Param parameter, float* value) {
 	if (nav_ack_packet.bit.status_code == NAV_ACK_OK && crc32(nav_ack_packet.reg, sizeof(nav_ack_packet.reg)) == CRC32_CHECK) {
 		Set_Vec3_Request set_request;
 		set_request.bit.header = NAV_SET_VEC3_REQUEST_HEADER;
+		set_request.bit.parameter = parameter;
 		mat_copy(value, 3, set_request.bit.data);
 		set_request.bit.crc = crc32(set_request.reg, sizeof(set_request.reg) - 4);
 		nav_stream(set_request.reg, sizeof(set_request.reg));

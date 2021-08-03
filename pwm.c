@@ -5,6 +5,7 @@
 static uint32_t port_in_state[12];
 static uint32_t pwm_in_time[12];
 static uint_fast8_t pwm_in_index;
+extern bool arm;
 
 
 void pwm_write(uint8_t channel, float position) {
@@ -43,7 +44,8 @@ void pwm_write_all(PWM_in value) {
 	rudd = (rudd >= PWM_DUTY_MIN) ? rudd : PWM_DUTY_MIN;
 	
 	// write to pwm channels
-	TCC0->CC[PWM_WRITE_THRO].bit.CC = thro;
+	// check throttle channel is armed
+	TCC0->CC[PWM_WRITE_THRO].bit.CC = (arm) ? thro : PWM_DUTY_MIN;
 	TCC0->CC[PWM_WRITE_ALE].bit.CC = ale;
 	TCC0->CC[PWM_WRITE_ELEV].bit.CC = elev;
 	TCC0->CC[PWM_WRITE_RUDD].bit.CC = rudd;

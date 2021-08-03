@@ -3,5 +3,6 @@
 
 #include "util.h"
 
+#define TEST
 
 #endif

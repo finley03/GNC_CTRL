@@ -24,19 +24,19 @@ CTRL_ACK_Packet ctrl_ack_packet;
 
 bool nav_poll;
 bool guidance_run;
+bool arm;
+
+#ifdef TEST
+static float position[3] = {0, -2, -2};
+#endif
 
 
 int main(void) {
 	
 	init();
 	
-	//float PID[3] = {2, 0.3, 0.2};
-	//control_set_value(_PID_X, PID);
-	//control_set_value(_PID_Y, PID);
-	//control_set_value(_PID_Z, PID);
-	//AIRCR
-	float ws = 1;
-	control_set_value(_WAYPOINT_THRESHOLD, &ws);
+	//float ws = 1;
+	//control_set_value(_WAYPOINT_THRESHOLD, &ws);
 
 	while(1) {
 		delay_ms(20);
@@ -56,28 +56,32 @@ int main(void) {
 			REG_PORT_OUTCLR1 = LED;
 		}
 		
-		
-		static float position[3] = {0, -2, -2};
-		
 		PWM_in pwm_in = pwm_read();
 		if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
 		else {
 			static float target_orientation[3] = {0, 0, 0};
 			
 			if (guidance_run) {
-				//float target_orientation[3];
+				#ifndef TEST
+				static float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
+				#endif
+				
 				float target_vector[3];
 				guidance(position, target_orientation, target_vector);
-				mat_scalar_product(target_vector, i_time * 0.1, 3, target_vector);
+				mat_scalar_product(target_vector, i_time, 3, target_vector);
+				#ifdef TEST
 				mat_add(position, target_vector, 3, position);
+				#endif
 			}
 			
 			float measured_orientation[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
 			control(target_orientation, measured_orientation);
 		
+			#ifdef TEST
 			nav_data_packet.bit.position_x = position[0];
 			nav_data_packet.bit.position_y = position[1];
 			nav_data_packet.bit.position_z = position[2];
+			#ifndef TEST
 		}
 		
 		txc_wireless_data();
@@ -135,6 +139,9 @@ void txc_wireless_data() {
 			// reset guidance
 			case 0x0002:
 			reset_guidance();
+			position[0] = 0;
+			position[1] = -2;
+			position[2] = -2;
 			break;
 			
 			// start guidance
@@ -147,6 +154,16 @@ void txc_wireless_data() {
 			guidance_run = false;
 			break;
 			
+			// motor arm
+			case 0x0005:
+			arm = true;
+			break;
+			
+			// motor disarm
+			case 0x0006:
+			arm = false;
+			break;
+						
 			// eeprom read byte
 			case 0x0040:
 			{
