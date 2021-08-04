@@ -88,9 +88,11 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 		case ADD:
 		case SUB:
 		case MUL:
+		case DIV:
 		case ADD_ASSIGN:
 		case SUB_ASSIGN:
 		case MUL_ASSIGN:
+		case DIV_ASSIGN:
 			*address += 4;
 			break;
 
