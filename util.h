@@ -44,6 +44,7 @@ typedef enum {
 	_MAG_B, // mag offset vector
 	_ACCEL_B, // accel offset vector
 	_GYRO_B, // gyro offset vector
+	_BARO_HEIGHT_CAL,
 	
 	_NAV_VOLATILE_PARAM_START = 24576
 } CTRL_Param;

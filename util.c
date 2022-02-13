@@ -147,6 +147,7 @@ void control_load_values() {
 	nav_load_scalar(_KALMAN_ANGULARVELOCITY_VARIANCE);
 	nav_load_scalar(_KALMAN_GNSS_ZEROLAT);
 	nav_load_scalar(_KALMAN_GNSS_ZEROLONG);
+	nav_load_scalar(_BARO_HEIGHT_CAL);
 	nav_load_vec3(_MAG_A_1);
 	nav_load_vec3(_MAG_A_2);
 	nav_load_vec3(_MAG_A_3);
@@ -276,6 +277,9 @@ void control_write_value(CTRL_Param parameter, float* value) {
 		case _GYRO_B:
 		spi_eeprom_write_n_s(EEPROM_GYRO_B, value, VEC3_SIZE);
 		break;
+		case _BARO_HEIGHT_CAL:
+		spi_eeprom_write_n_s(EEPROM_BARO_HEIGHT_CAL, value, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -333,6 +337,9 @@ void control_read_eeprom(CTRL_Param parameter, float* value) {
 		break;
 		case _GYRO_B:
 		spi_eeprom_read_n(EEPROM_GYRO_B, value, VEC3_SIZE);
+		break;
+		case _BARO_HEIGHT_CAL:
+		spi_eeprom_read_n(EEPROM_BARO_HEIGHT_CAL, value, SCALAR_SIZE);
 		break;
 		default:
 		break;

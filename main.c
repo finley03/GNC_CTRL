@@ -62,13 +62,16 @@ int main(void) {
 			static float target_orientation[3] = {0, 0, 0};
 			
 			if (guidance_run) {
+				//#ifdef TEST
+				//static float position[3] = {0, -2, -2};
 				#ifndef TEST
-				static float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
+				float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
 				#endif
 				
 				float target_vector[3];
 				guidance(position, target_orientation, target_vector);
 				mat_scalar_product(target_vector, i_time, 3, target_vector);
+				
 				#ifdef TEST
 				mat_add(position, target_vector, 3, position);
 				#endif
@@ -81,7 +84,7 @@ int main(void) {
 			nav_data_packet.bit.position_x = position[0];
 			nav_data_packet.bit.position_y = position[1];
 			nav_data_packet.bit.position_z = position[2];
-			#ifndef TEST
+			#endif
 		}
 		
 		txc_wireless_data();
@@ -139,9 +142,11 @@ void txc_wireless_data() {
 			// reset guidance
 			case 0x0002:
 			reset_guidance();
+			#ifdef TEST
 			position[0] = 0;
 			position[1] = -2;
 			position[2] = -2;
+			#endif
 			break;
 			
 			// start guidance
