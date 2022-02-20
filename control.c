@@ -45,12 +45,16 @@ void control(float* set, float* measured) {
 	mat_subtract(set, measured, 3, world_error);
 	
 	// matrix that transforms orientation from world space to board space
-	const float pi_180 = 0.01745329;
+	//const float pi_180 = 0.01745329;
 	
-	float sinx = sin(measured[0] * pi_180);
-	float siny = sin(measured[1] * pi_180);
-	float cosx = cos(measured[0] * pi_180);
-	float cosy = cos(measured[1] * pi_180);
+	//float sinx = sin(measured[0] * pi_180);
+	//float siny = sin(measured[1] * pi_180);
+	//float cosx = cos(measured[0] * pi_180);
+	//float cosy = cos(measured[1] * pi_180);
+	float sinx = sin(radians(measured[0]));
+	float siny = sin(radians(measured[1]));
+	float cosx = cos(radians(measured[0]));
+	float cosy = cos(radians(measured[1]));
 	
 	float euler_mat[9] = {
 		1, 0, -siny,

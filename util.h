@@ -51,8 +51,8 @@ typedef enum {
 
 //#define F_CPU 48000000
 #define LED PORT_PB11
-#define LED_ON() (REG_PORT_OUTSET1 = LED);
-#define LED_OFF() (REG_PORT_OUTCLR1 = LED);
+#define LED_ON() (REG_PORT_OUTSET1 = LED)
+#define LED_OFF() (REG_PORT_OUTCLR1 = LED)
 
 #define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
@@ -98,6 +98,11 @@ void nav_load_vec3(CTRL_Param parameter);
 void nav_load_scalar(CTRL_Param parameter);
 void nav_save_vec3(CTRL_Param parameter);
 void nav_save_scalar(CTRL_Param parameter);
+
+void ack_ok();
+void ack_error();
+void ack_error_flush_restart();
+void wireless_flush_restart();
 
 
 #define NAV_DEVICE_ID 0xd5d5

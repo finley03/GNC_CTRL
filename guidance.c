@@ -1,5 +1,6 @@
 #include "guidance.h"
 #include "spi_eeprom.h"
+#include "uart.h"
 
 #define POINT 0x01
 #define PRINT 0x02
@@ -423,6 +424,7 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 		run_code(false);
 		once = false;
 		turn = false;
+		ENABLE_KALMAN_ORIENTATION_UPDATE();
 	}
 	
 	static float average_velocity = 0;
@@ -467,6 +469,7 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 		if (position_target_dotp_value >= target_dotp_value - waypoint_threshold) {
 			run_code(false);
 			turn = true;
+			DISABLE_KALMAN_ORIENTATION_UPDATE();
 			
 			// assign turn parameters
 			float waypoint_turn_start_vector[3];
@@ -515,6 +518,7 @@ void guidance(float* position, float* target_orientation, float* target_vector) 
 		float target_angle;
 		if (angle_round_turn >= turn_angle - 1) {
 			turn = false;
+			ENABLE_KALMAN_ORIENTATION_UPDATE();
 			target_angle = turn_angle;
 		}
 		else {

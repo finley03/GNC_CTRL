@@ -1,6 +1,7 @@
 #include "util.h"
 #include "spi_eeprom.h"
 #include "uart.h"
+#include "dma.h"
 
 
 extern float PID_X[3];
@@ -489,4 +490,40 @@ void nav_read_scalar(CTRL_Param parameter, float* value) {
 		LED_ON();
 		while(1);
 	}
+}
+
+
+// send okay acknowledge packet
+void ack_ok() {
+	CTRL_ACK_Packet ctrl_ack_packet;
+	// set acknowledge response to ok
+	ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+	// set acknowledge packet crc
+	ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+	// send acknowledge packet
+	wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+}
+
+// send error acknowledge packet
+void ack_error() {
+	CTRL_ACK_Packet ctrl_ack_packet;
+	// set acknowledge response to errir
+	ctrl_ack_packet.bit.status_code = CTRL_ACK_ERROR;
+	// set acknowledge packet crc
+	ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+	// send acknowledge packet
+	wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+}
+
+// send error acknowledge packet, flush buffer, restart dma
+void ack_error_flush_restart() {
+	ack_error();
+	wireless_flush();
+	wireless_rx_dma_start();
+}
+
+// flush and restart dma, without ack packet
+void wireless_flush_restart() {
+	wireless_flush();
+	wireless_rx_dma_start();
 }

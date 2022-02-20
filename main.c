@@ -32,11 +32,7 @@ static float position[3] = {0, -2, -2};
 
 
 int main(void) {
-	
 	init();
-	
-	//float ws = 1;
-	//control_set_value(_WAYPOINT_THRESHOLD, &ws);
 
 	while(1) {
 		delay_ms(20);
@@ -51,13 +47,16 @@ int main(void) {
 		float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
 		if (nav_poll) {
-			REG_PORT_OUTSET1 = LED;
+			LED_ON();
 			txc_nav_data();
-			REG_PORT_OUTCLR1 = LED;
+			LED_OFF();
 		}
 		
+		// get pwm values
 		PWM_in pwm_in = pwm_read();
+		// check if override is set
 		if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
+		// run guidance routine
 		else {
 			static float target_orientation[3] = {0, 0, 0};
 			
@@ -97,13 +96,15 @@ int main(void) {
 void txc_nav_data() {
 	nav_uart_send(0x81);
 		
-	nav_read(nav_data_packet.reg, sizeof(nav_data_packet.reg));
-		
-	if (crc32(nav_data_packet.reg, sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
-		//serial_print("CRC Check Failed\n");
-		REG_PORT_OUTSET1 = LED;
-		while(1);
-	}
+	nav_read_timed(nav_data_packet.reg, sizeof(nav_data_packet.reg));
+	
+	// assume internal communications are okay	
+	
+	//if (crc32(nav_data_packet.reg, sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
+		////serial_print("CRC Check Failed\n");
+		//REG_PORT_OUTSET1 = LED;
+		//while(1);
+	//}
 }
 
 
@@ -112,6 +113,8 @@ void txc_wireless_data() {
 	// MSB is one for requests to NAV computer
 	// zero for requests to the CTRL computer
 	if (wireless_rx_dma_end()) {
+		// true if ack_ok packet should be sent at the end.
+		bool end_ack_packet = true;
 		//REG_PORT_OUTSET1 = LED;
 		uint16_t command;
 		if (crc32(transfer_request.reg, sizeof(transfer_request.reg)) == CRC32_CHECK &&
@@ -119,8 +122,18 @@ void txc_wireless_data() {
 			command = transfer_request.bit.command;
 		}
 		else  {
-			REG_PORT_OUTSET1 = LED;
-			while(1);
+			//LED_ON();
+			//while(1);
+			// flush buffer
+			wireless_flush();
+			// no ack
+			//end_ack_packet = false;
+			// reset rx buffer
+			//goto restart_dma;
+			wireless_rx_dma_start();
+			// report bad packet
+			ack_error();
+			return;
 		}
 		
 		wireless_flush();
@@ -174,18 +187,24 @@ void txc_wireless_data() {
 			{
 				// create data type
 				EEPROM_Read_Request eeprom_read_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				// set acknowledge packet crc
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//// set acknowledge packet crc
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+				if (!wireless_read(eeprom_read_request.reg, sizeof(eeprom_read_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg)) == CRC32_CHECK &&
 				eeprom_read_request.bit.header == EEPROM_READ_REQUEST_HEADER) {
+					ack_ok();
+					
 					CTRL_EEPROM_Read_packet ctrl_eeprom_read_packet;
 					// get data from eeprom
 					ctrl_eeprom_read_packet.bit.device_id = DEVICE_ID;
@@ -198,9 +217,16 @@ void txc_wireless_data() {
 					wireless_stream(ctrl_eeprom_read_packet.reg, sizeof(ctrl_eeprom_read_packet.reg));
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -209,14 +235,18 @@ void txc_wireless_data() {
 			{
 				// create data type
 				EEPROM_Write_Request eeprom_write_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				// set acknowledge packet crc
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//// set acknowledge packet crc
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+				if (!wireless_read(eeprom_write_request.reg, sizeof(eeprom_write_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg)) == CRC32_CHECK &&
@@ -225,11 +255,20 @@ void txc_wireless_data() {
 					spi_eeprom_write_enable();
 					spi_eeprom_write_byte(eeprom_write_request.bit.address, eeprom_write_request.bit.data);
 					spi_eeprom_write_disable();
+					
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -238,17 +277,23 @@ void txc_wireless_data() {
 			{
 				// create data type
 				EEPROM_Read_N_Request eeprom_read_request;
-				// send response ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// send response ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(eeprom_read_request.reg, sizeof(eeprom_read_request.reg));
+				if (!wireless_read(eeprom_read_request.reg, sizeof(eeprom_read_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(eeprom_read_request.reg, sizeof(eeprom_read_request.reg)) == CRC32_CHECK &&
 				eeprom_read_request.bit.header == EEPROM_READ_N_REQUEST_HEADER) {
+					ack_ok();
+					
 					CTRL_EEPROM_Read_N_packet ctrl_eeprom_read_packet;
 					// get data from eeprom
 					ctrl_eeprom_read_packet.bit.device_id = DEVICE_ID;
@@ -263,9 +308,16 @@ void txc_wireless_data() {
 					wireless_stream(ctrl_eeprom_read_packet.reg, sizeof(ctrl_eeprom_read_packet.reg));
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -274,13 +326,17 @@ void txc_wireless_data() {
 			{
 				// create data type
 				EEPROM_Write_N_Request eeprom_write_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(eeprom_write_request.reg, sizeof(eeprom_write_request.reg));
+				if (!wireless_read(eeprom_write_request.reg, sizeof(eeprom_write_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(eeprom_write_request.reg, sizeof(eeprom_write_request.reg)) == CRC32_CHECK &&
@@ -290,11 +346,19 @@ void txc_wireless_data() {
 					//spi_eeprom_write_byte(eeprom_write_request.bit.address, eeprom_write_request.bit.data);
 					spi_eeprom_write_n_s(eeprom_write_request.bit.address, eeprom_write_request.bit.data, eeprom_write_request.bit.size);
 					//spi_eeprom_write_disable();
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -303,13 +367,17 @@ void txc_wireless_data() {
 			{
 				// create data type
 				Set_Vec3_Request set_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(set_request.reg, sizeof(set_request.reg));
+				if (!wireless_read(set_request.reg, sizeof(set_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(set_request.reg, sizeof(set_request.reg)) == CRC32_CHECK &&
@@ -320,11 +388,20 @@ void txc_wireless_data() {
 					else {
 						control_set_value((CTRL_Param) set_request.bit.parameter, set_request.bit.data);
 					}
+					
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -332,15 +409,20 @@ void txc_wireless_data() {
 			case 0x0045:
 			{
 				Read_Vec3_Request read_request;
-				// return ack packet
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// return ack packet
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for request
-				wireless_read(read_request.reg, sizeof(read_request.reg));
+				if (!wireless_read(read_request.reg, sizeof(read_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				// check request is valid
 				if (crc32(read_request.reg, sizeof(read_request.reg)) == CRC32_CHECK &&
 				read_request.bit.header == READ_VEC3_REQUEST_HEADER) {
+					ack_ok();
 					Read_Vec3_Response read_packet;
 					read_packet.bit.device_id = DEVICE_ID;
 					if (read_request.bit.parameter > _NAV_PARAM_START) {
@@ -353,9 +435,16 @@ void txc_wireless_data() {
 					wireless_stream(read_packet.reg, sizeof(read_packet.reg));
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -364,13 +453,17 @@ void txc_wireless_data() {
 			{
 				// create data type
 				Save_Vec3_Request save_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(save_request.reg, sizeof(save_request.reg));
+				if (!wireless_read(save_request.reg, sizeof(save_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				
 				// check packet is valid
 				if (crc32(save_request.reg, sizeof(save_request.reg)) == CRC32_CHECK &&
@@ -385,11 +478,20 @@ void txc_wireless_data() {
 						//control_read_value((CTRL_Param) read_request.bit.parameter, &read_packet.bit.data);
 						control_save_value((CTRL_Param) save_request.bit.parameter);
 					}
+					
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -397,12 +499,16 @@ void txc_wireless_data() {
 			case 0x0047:
 			{
 				Set_Scalar_Request set_request;
-				// return acknowledge packet
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// return acknowledge packet
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(set_request.reg, sizeof(set_request.reg));
+				if (!wireless_read(set_request.reg, sizeof(set_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				// check request is valid
 				if (crc32(set_request.reg, sizeof(set_request.reg)) == CRC32_CHECK &&
 				set_request.bit.header == SET_SCALAR_REQUEST_HEADER) {
@@ -412,11 +518,20 @@ void txc_wireless_data() {
 					else {
 						control_set_value((CTRL_Param) set_request.bit.parameter, &set_request.bit.data);
 					}
+					
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -424,15 +539,21 @@ void txc_wireless_data() {
 			case 0x0048:
 			{
 				Read_Scalar_Request read_request;
-				// return ack packet
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// return ack packet
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for request
-				wireless_read(read_request.reg, sizeof(read_request.reg));
+				if (!wireless_read(read_request.reg, sizeof(read_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 				// check request is valid
 				if (crc32(read_request.reg, sizeof(read_request.reg)) == CRC32_CHECK &&
 				read_request.bit.header == READ_SCALAR_REQUEST_HEADER) {
+					// send okay ack packet
+					ack_ok();
 					//Read_Scalar_Response read_packet;
 					//read_packet.bit.device_id = DEVICE_ID;
 					//control_read_value((CTRL_Param) read_request.bit.parameter, &read_packet.bit.data);
@@ -450,9 +571,16 @@ void txc_wireless_data() {
 					wireless_stream(read_packet.reg, sizeof(read_packet.reg));
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -461,13 +589,17 @@ void txc_wireless_data() {
 			{
 				// create data type
 				Save_Scalar_Request save_request;
-				// set acknowledge response to ok
-				ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
-				ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
-				// send acknowledge packet
-				wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
+				ack_ok();
+				//// set acknowledge response to ok
+				//ctrl_ack_packet.bit.status_code = CTRL_ACK_OK;
+				//ctrl_ack_packet.bit.crc = crc32(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg) - 4);
+				//// send acknowledge packet
+				//wireless_stream(ctrl_ack_packet.reg, sizeof(ctrl_ack_packet.reg));
 				// wait for data request
-				wireless_read(save_request.reg, sizeof(save_request.reg));
+				if (!wireless_read(save_request.reg, sizeof(save_request.reg))) {
+					wireless_flush_restart();
+					return;
+				}
 								
 				// check packet is valid
 				if (crc32(save_request.reg, sizeof(save_request.reg)) == CRC32_CHECK &&
@@ -482,16 +614,26 @@ void txc_wireless_data() {
 						//control_read_value((CTRL_Param) read_request.bit.parameter, &read_packet.bit.data);
 						control_save_value((CTRL_Param) save_request.bit.parameter);
 					}
+					
+					ack_ok();
 				}
 				else {
-					REG_PORT_OUTSET1 = LED;
-					while(1);
+					//LED_ON();
+					//while(1);
+					//ack_error();
+					//wireless_flush();
+					//wireless_rx_dma_start();
+					ack_error_flush_restart();
+					return;
 				}
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
 			// system reset
 			case 0x007F:
+			end_ack_packet = false;
 			NVIC_SystemReset();
 			break;
 			
@@ -502,6 +644,7 @@ void txc_wireless_data() {
 			// case for nav self test
 			case 0x0080:
 			{
+				ack_ok();
 				// send command for self test
 				nav_uart_send(0x80);
 				
@@ -509,18 +652,23 @@ void txc_wireless_data() {
 				
 				if (crc32(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg)) != CRC32_CHECK) {
 					//serial_print("CRC Check Failed\n");
-					REG_PORT_OUTSET1 = LED;
+					LED_ON();
 					while(1);
 				}
 				
 				wireless_stream(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg));
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
 			// command to send nav_data_packet
 			case 0x0081:
 			{
+				ack_ok();
 				wireless_stream(nav_data_packet.reg, sizeof(nav_data_packet.reg));
+				end_ack_packet = false;
+				wireless_rx_dma_start();
 			}
 			break;
 			
@@ -548,24 +696,44 @@ void txc_wireless_data() {
 			nav_save_vec3(_MAG_B);
 			break;
 			
+			// enable kalman orientation update step
+			case 0x0086:
+			nav_uart_send(0x89);
+			break;
+			
+			// disable kalman orientation update step
+			case 0x0087:
+			nav_uart_send(0x8A);
+			break;
+			
 			// nav computer reset
 			case 0x00FF:
 			nav_uart_send(0xFF);
+			//end_ack_packet = false;
+			//wireless_rx_dma_start();
 			break;
 			
 			default:
 			{
 				//delay_ms(1);
 				serial_send(command);
-				REG_PORT_OUTSET1 = LED;
+				LED_ON();
 				while(1);
 			}
 			break;
 		}
 		
-		// restart DMA
-		wireless_rx_dma_start();
-		//REG_PORT_OUTCLR1 = LED;
+//restart_dma:		
+		
+		//// restart DMA
+		//wireless_rx_dma_start();
+		////REG_PORT_OUTCLR1 = LED;
+		
+		if (end_ack_packet) {
+			// restart dma
+			wireless_rx_dma_start();
+			ack_ok();
+		}
 	}
 }
 
@@ -585,6 +753,7 @@ void init() {
 	
 	// set LED to output
 	REG_PORT_DIRSET1 = LED;
+	//LED_ON();
 	
 	// set SS pins high
 	REG_PORT_DIRSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
@@ -601,4 +770,6 @@ void init() {
 	
 	nav_poll = true;
 	guidance_run = false;
+	
+	ack_ok();
 }

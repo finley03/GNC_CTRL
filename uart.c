@@ -141,13 +141,17 @@ void wireless_print(char *addr) {
 	}
 }
 
-void wireless_read(uint8_t* addr, uint32_t n) {
+bool wireless_read(uint8_t* addr, uint32_t n) {
 	for (uint32_t i = 0; i < n; ++i) {
+		uint32_t current_time = TIMER_REG;
 		// wait until data available
-		while(!SERCOM1->USART.INTFLAG.bit.RXC);
+		while(!SERCOM1->USART.INTFLAG.bit.RXC) {
+			if (TIMER_REG - current_time > WIRELESS_READ_WAIT_TIME) return false;
+		}
 		
 		addr[i] = (uint8_t) (SERCOM1->USART.DATA.reg);
 	}
+	return true;
 }
 
 void wireless_init() {
@@ -257,6 +261,19 @@ void nav_read(uint8_t* addr, uint32_t n) {
 		
 		addr[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
 	}
+}
+
+bool nav_read_timed(uint8_t* addr, uint32_t n) {
+	for (uint32_t i = 0; i < n; ++i) {
+		uint32_t current_time = TIMER_REG;
+		// wait until data available
+		while(!SERCOM0->USART.INTFLAG.bit.RXC) {
+			if (TIMER_REG - current_time > NAV_READ_WAIT_TIME) return false;
+		}
+		
+		addr[i] = (uint8_t) (SERCOM0->USART.DATA.reg);
+	}
+	return true;
 }
 
 void nav_uart_init() {
