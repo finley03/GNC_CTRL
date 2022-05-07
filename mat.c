@@ -290,6 +290,10 @@ void vec_2_normalize(float* mat, float* writeback) {
 	writeback[1] = mat[1] * scalar;
 }
 
+float vec_2_length(float* mat) {
+	return sqrtf(mat[0] * mat[0] + mat[1] * mat[1]);
+}
+
 void vec_3_normalize(float* mat, float* writeback) {
 	float scalar = 1 / sqrt(mat[0] * mat[0] + mat[1] * mat[1] + mat[2] * mat[2]);
 	

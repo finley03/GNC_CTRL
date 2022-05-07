@@ -1,7 +1,7 @@
 #ifndef SPI_H
 #define SPI_H
 
-#include "samd21g18a.h"
+#include "util.h"
 #include "time.h"
 
 // SERCOM3

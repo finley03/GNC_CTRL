@@ -1,7 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include "samd21g18a.h"
+#include "samd21.h"
 #include "time.h"
 #include "mat.h"
 
@@ -23,6 +23,10 @@ typedef enum {
 	_POSITION_PID,
 	_WAYPOINT_THRESHOLD,
 	_THRO_CONFIG,
+	_CHANNEL_TRIM,
+	_CHANNEL_REVERSE,
+	_HEADING_PID,
+	_ALTITUDE_PID,
 	
 	_CTRL_VOLATILE_PARAM_START = 8192,
 	
@@ -53,6 +57,7 @@ typedef enum {
 #define LED PORT_PB11
 #define LED_ON() (REG_PORT_OUTSET1 = LED)
 #define LED_OFF() (REG_PORT_OUTCLR1 = LED)
+#define LED_TOGGLE() (REG_PORT_OUTTGL0 = LED)
 
 #define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
@@ -85,10 +90,10 @@ void sbinary32(char* buffer, uint32_t value);
 void control_load_values();
 void control_load_value(CTRL_Param parameter);
 void control_save_value(CTRL_Param parameter);
-void control_write_value(CTRL_Param parameter, float* value);
-void control_read_eeprom(CTRL_Param parameter, float* value);
-void control_set_value(CTRL_Param parameter, float* value);
-void control_read_value(CTRL_Param parameter, float* value);
+void control_write_value(CTRL_Param parameter, void* value);
+void control_read_eeprom(CTRL_Param parameter, void* value);
+void control_set_value(CTRL_Param parameter, void* value);
+void control_read_value(CTRL_Param parameter, void* value);
 
 void nav_set_vec3(CTRL_Param parameter, float* value);
 void nav_set_scalar(CTRL_Param parameter, float* value);
@@ -103,6 +108,9 @@ void ack_ok();
 void ack_error();
 void ack_error_flush_restart();
 void wireless_flush_restart();
+
+void enable_kalman_orientation_update();
+void disable_kalman_orientation_update();
 
 
 #define NAV_DEVICE_ID 0xd5d5

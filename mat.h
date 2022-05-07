@@ -31,6 +31,7 @@ void mat_crossp(float* mat1, float* mat2, float* writeback);
 float mat_dotp(float* mat1, float* mat2, uint32_t size);
 
 void vec_2_normalize(float* mat, float* writeback);
+float vec_2_length(float* mat);
 void vec_3_normalize(float* mat, float* writeback);
 float vec_3_length(float* mat);
 

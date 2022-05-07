@@ -20,6 +20,10 @@
 #define EEPROM_POSITION_PID 0x1048 // vec3
 #define EEPROM_WAYPOINT_THRESHOLD 0x1054 // scalar
 #define EEPROM_THRO_CONFIG 0x1058 // vec3 (zero, proportional pitch, reserved)
+#define EEPROM_CHANNEL_TRIM 0x1064 // vec3 (aileron, elevator, rudder)
+#define EEPROM_CHANNEL_REVERSE 0x1070 // int32 (packed booleans)
+#define EEPROM_HEADING_PID 0x1074 // vec3
+#define EEPROM_ALTITUDE_PID 0x1080 // vec3
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 
@@ -40,11 +44,12 @@
 #define EEPROM_GYRO_B 0x1880 // vec3
 #define EEPROM_KALMAN_GNSS_HORIZONTAL_UNCERTAINTY_MUL 0x188C // scalar
 #define EEPROM_KALMAN_GNSS_VERTICAL_UNCERTAINTY_MUL 0x1890 // scalar
-#define EEPROM_BARO_HEIGHT_CAL 1894 // scalar
+#define EEPROM_BARO_HEIGHT_CAL 0x1894 // scalar
 
 
 #define SCALAR_SIZE (sizeof(float))
 #define VEC3_SIZE (3 * sizeof(float))
+#define INT32_SIZE (sizeof(int32_t))
 // 
 
 void spi_eeprom_init();

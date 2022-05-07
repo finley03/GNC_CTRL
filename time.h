@@ -1,7 +1,7 @@
 #ifndef TIME_H
 #define TIME_H
 
-#include "samd21g18a.h"
+#include "util.h"
 
 #ifndef F_CPU
 #define F_CPU 48000000UL

@@ -43,8 +43,8 @@ void nav_read(uint8_t* addr, uint32_t n);
 bool nav_read_timed(uint8_t* addr, uint32_t n);
 void nav_stream(uint8_t* addr, uint32_t nr_bytes);
 
-#define ENABLE_KALMAN_ORIENTATION_UPDATE() nav_uart_send(0x89)
-#define DISABLE_KALMAN_ORIENTATION_UPDATE() nav_uart_send(0x8A)
+//#define ENABLE_KALMAN_ORIENTATION_UPDATE() nav_uart_send(0x89)
+//#define DISABLE_KALMAN_ORIENTATION_UPDATE() nav_uart_send(0x8A)
 
 
 #endif

@@ -25,6 +25,10 @@ CTRL_ACK_Packet ctrl_ack_packet;
 bool nav_poll;
 bool guidance_run;
 bool arm;
+// true if origin should be set (when guidance begins / resumes)
+bool set_origin;
+
+float test;
 
 #ifdef TEST
 static float position[3] = {0, -2, -2};
@@ -55,29 +59,50 @@ int main(void) {
 		// get pwm values
 		PWM_in pwm_in = pwm_read();
 		// check if override is set
-		if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
+		//if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
+		if (PWM_BOOL(pwm_in.ovr)) {
+			control_passthrough(&pwm_in);
+			set_origin = true;
+		}
 		// run guidance routine
 		else {
-			static float target_orientation[3] = {0, 0, 0};
+			//static float target_orientation[3] = {0, 0, 0};
+			//static float roll, pitch;
+			float measured_position[3] = { nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z };
+			float measured_orientation[3] = { nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z };
+			//control(0, 0, measured_orientation);
+			//guidance_manual(&pwm_in, measured_orientation);
+			//guidance_manual_heading_hold(&pwm_in, measured_orientation);
+			if (guidance_run) guidance_auto(measured_position, measured_orientation, &set_origin);
 			
-			if (guidance_run) {
+			nav_data_packet.bit.debug1 = test;
+			
+			//if (guidance_run) {
+				////#ifdef TEST
+				////static float position[3] = {0, -2, -2};
+				//#ifndef TEST
+				//float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
+				//#endif
+				//
+				//float target_vector[3];
+				//guidance(position, target_orientation, target_vector);
+				//
 				//#ifdef TEST
-				//static float position[3] = {0, -2, -2};
-				#ifndef TEST
-				float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
-				#endif
-				
-				float target_vector[3];
-				guidance(position, target_orientation, target_vector);
-				mat_scalar_product(target_vector, i_time, 3, target_vector);
-				
-				#ifdef TEST
-				mat_add(position, target_vector, 3, position);
-				#endif
-			}
+				//mat_scalar_product(target_vector, i_time, 3, target_vector);
+				//mat_add(position, target_vector, 3, position);
+				//#endif
+			//}
 			
-			float measured_orientation[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
-			control(target_orientation, measured_orientation);
+			//if (guidance_run) {
+				//float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
+				//
+				//guidance(position, nav_data_packet.bit.orientation_z, &roll, &pitch);
+			//}
+			//
+			//float measured_orientation[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
+			//float measured_acceleration[3] = {nav_data_packet.bit.accelraw_x, nav_data_packet.bit.accelraw_y, nav_data_packet.bit.accelraw_z};
+			//_control(target_orientation, measured_orientation);
+			////control(roll, pitch, measured_orientation, measured_acceleration, 8.0f);
 		
 			#ifdef TEST
 			nav_data_packet.bit.position_x = position[0];
@@ -165,6 +190,7 @@ void txc_wireless_data() {
 			// start guidance
 			case 0x0003:
 			guidance_run = true;
+			set_origin = true;
 			break;
 			
 			// stop guidance;
@@ -706,6 +732,12 @@ void txc_wireless_data() {
 			nav_uart_send(0x8A);
 			break;
 			
+			// calibrate gyroscope
+			case 0x0088:
+			nav_poll = false;
+			nav_uart_send(0x8B);
+			break;
+			
 			// nav computer reset
 			case 0x00FF:
 			nav_uart_send(0xFF);
@@ -739,6 +771,10 @@ void txc_wireless_data() {
 
 
 void init() {
+	// set LED to output
+	REG_PORT_DIRSET1 = LED;
+	LED_ON();
+	
 	set_clock_48m();
 	init_timer();
 	start_timer();
@@ -750,10 +786,6 @@ void init() {
 	nav_uart_init();
 	spi_init();
 	spi_eeprom_init();
-	
-	// set LED to output
-	REG_PORT_DIRSET1 = LED;
-	//LED_ON();
 	
 	// set SS pins high
 	REG_PORT_DIRSET0 = PORT_PA25 | PORT_PA27 | PORT_PA28;
@@ -768,8 +800,12 @@ void init() {
 	control_load_values();
 	reset_guidance();
 	
-	nav_poll = true;
+	nav_poll = false;
 	guidance_run = false;
+	set_origin = true;
 	
-	ack_ok();
+	//ack_ok();
+	LED_OFF();
+	
+	serial_print("init complete\n");
 }

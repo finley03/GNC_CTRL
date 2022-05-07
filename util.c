@@ -11,6 +11,10 @@ extern float mix_mat[9];
 extern float position_pid[3];
 extern float waypoint_threshold;
 extern float thro_config[3];
+extern float channel_trim[3];
+extern int32_t channel_reverse;
+extern float heading_pid[3];
+extern float altitude_pid[3];
 
 
 void LED_print_8(uint8_t data) {
@@ -137,6 +141,10 @@ void control_load_values() {
 	control_load_value(_POSITION_PID);
 	control_load_value(_WAYPOINT_THRESHOLD);
 	control_load_value(_THRO_CONFIG);
+	control_load_value(_CHANNEL_TRIM);
+	control_load_value(_CHANNEL_REVERSE);
+	control_load_value(_HEADING_PID);
+	control_load_value(_ALTITUDE_PID);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -184,7 +192,19 @@ void control_load_value(CTRL_Param parameter) {
 		spi_eeprom_read_n(EEPROM_WAYPOINT_THRESHOLD, &waypoint_threshold, SCALAR_SIZE);
 		break;
 		case _THRO_CONFIG:
-		spi_eeprom_read_n(EEPROM_THRO_CONFIG, &thro_config, VEC3_SIZE);
+		spi_eeprom_read_n(EEPROM_THRO_CONFIG, thro_config, VEC3_SIZE);
+		break;
+		case _CHANNEL_TRIM:
+		spi_eeprom_read_n(EEPROM_CHANNEL_TRIM, channel_trim, VEC3_SIZE);
+		break;
+		case _CHANNEL_REVERSE:
+		spi_eeprom_read_n(EEPROM_CHANNEL_REVERSE, &channel_reverse, INT32_SIZE);
+		break;
+		case _HEADING_PID:
+		spi_eeprom_read_n(EEPROM_HEADING_PID, heading_pid, VEC3_SIZE);
+		break;
+		case _ALTITUDE_PID:
+		spi_eeprom_read_n(EEPROM_ALTITUDE_PID, altitude_pid, VEC3_SIZE);
 		break;
 		default:
 		break;
@@ -218,14 +238,26 @@ void control_save_value(CTRL_Param parameter) {
 		spi_eeprom_write_n_s(EEPROM_WAYPOINT_THRESHOLD, &waypoint_threshold, SCALAR_SIZE);
 		break;
 		case _THRO_CONFIG:
-		spi_eeprom_write_n_s(EEPROM_THRO_CONFIG, &thro_config, VEC3_SIZE);
+		spi_eeprom_write_n_s(EEPROM_THRO_CONFIG, thro_config, VEC3_SIZE);
+		break;
+		case _CHANNEL_TRIM:
+		spi_eeprom_write_n_s(EEPROM_CHANNEL_TRIM, channel_trim, VEC3_SIZE);
+		break;
+		case _CHANNEL_REVERSE:
+		spi_eeprom_write_n_s(EEPROM_CHANNEL_REVERSE, &channel_reverse, INT32_SIZE);
+		break;
+		case _HEADING_PID:
+		spi_eeprom_write_n_s(EEPROM_HEADING_PID, heading_pid, VEC3_SIZE);
+		break;
+		case _ALTITUDE_PID:
+		spi_eeprom_write_n_s(EEPROM_ALTITUDE_PID, altitude_pid, VEC3_SIZE);
 		break;
 		default:
 		break;
 	}
 }
 
-void control_write_value(CTRL_Param parameter, float* value) {
+void control_write_value(CTRL_Param parameter, void* value) {
 	switch (parameter) {
 		case _KALMAN_POSITION_UNCERTAINTY:
 		spi_eeprom_write_n_s(EEPROM_KALMAN_POSITION_UNCERTAINTY, value, VEC3_SIZE);
@@ -286,7 +318,7 @@ void control_write_value(CTRL_Param parameter, float* value) {
 	}
 }
 
-void control_read_eeprom(CTRL_Param parameter, float* value) {
+void control_read_eeprom(CTRL_Param parameter, void* value) {
 	switch (parameter) {
 		case _KALMAN_POSITION_UNCERTAINTY:
 		spi_eeprom_read_n(EEPROM_KALMAN_POSITION_UNCERTAINTY, value, VEC3_SIZE);
@@ -347,68 +379,92 @@ void control_read_eeprom(CTRL_Param parameter, float* value) {
 	}
 }
 
-void control_set_value(CTRL_Param parameter, float* value) {
+void control_set_value(CTRL_Param parameter, void* value) {
 	switch (parameter) {
 		case _PID_X:
-		mat_copy(value, 3, PID_X);
+		mat_copy((float*)value, 3, PID_X);
 		break;
 		case _PID_Y:
-		mat_copy(value, 3, PID_Y);
+		mat_copy((float*)value, 3, PID_Y);
 		break;
 		case _PID_Z:
-		mat_copy(value, 3, PID_Z);
+		mat_copy((float*)value, 3, PID_Z);
 		break;
 		case _X_MIX:
-		mat_copy(value, 3, mix_mat);
+		mat_copy((float*)value, 3, mix_mat);
 		break;
 		case _Y_MIX:
-		mat_copy(value, 3, mix_mat + 3);
+		mat_copy((float*)value, 3, mix_mat + 3);
 		break;
 		case _Z_MIX:
-		mat_copy(value, 3, mix_mat + 6);
+		mat_copy((float*)value, 3, mix_mat + 6);
 		break;
 		case _POSITION_PID:
-		mat_copy(value, 3, position_pid);
+		mat_copy((float*)value, 3, position_pid);
 		break;
 		case _WAYPOINT_THRESHOLD:
-		waypoint_threshold = *value;
+		waypoint_threshold = *(float*)value;
 		break;
 		case _THRO_CONFIG:
-		mat_copy(value, 3, thro_config);
+		mat_copy((float*)value, 3, thro_config);
+		break;
+		case _CHANNEL_TRIM:
+		mat_copy((float*)value, 3, channel_trim);
+		break;
+		case _CHANNEL_REVERSE:
+		channel_reverse = *(int32_t*)value;
+		break;
+		case _HEADING_PID:
+		mat_copy((float*)value, 3, heading_pid);
+		break;
+		case _ALTITUDE_PID:
+		mat_copy((float*)value, 3, altitude_pid);
 		break;
 		default:
 		break;
 	}
 }
 
-void control_read_value(CTRL_Param parameter, float* value) {
+void control_read_value(CTRL_Param parameter, void* value) {
 	switch (parameter) {
 		case _PID_X:
-		mat_copy(PID_X, 3, value);
+		mat_copy(PID_X, 3, (float*)value);
 		break;
 		case _PID_Y:
-		mat_copy(PID_Y, 3, value);
+		mat_copy(PID_Y, 3, (float*)value);
 		break;
 		case _PID_Z:
-		mat_copy(PID_Z, 3, value);
+		mat_copy(PID_Z, 3, (float*)value);
 		break;
 		case _X_MIX:
-		mat_copy(mix_mat, 3, value);
+		mat_copy(mix_mat, 3, (float*)value);
 		break;
 		case _Y_MIX:
-		mat_copy(mix_mat + 3, 3, value);
+		mat_copy(mix_mat + 3, 3, (float*)value);
 		break;
 		case _Z_MIX:
-		mat_copy(mix_mat + 6, 3, value);
+		mat_copy(mix_mat + 6, 3, (float*)value);
 		break;
 		case _POSITION_PID:
-		mat_copy(position_pid, 3, value);
+		mat_copy(position_pid, 3, (float*)value);
 		break;
 		case _WAYPOINT_THRESHOLD:
-		*value = waypoint_threshold;
+		*(float*)value = waypoint_threshold;
 		break;
 		case _THRO_CONFIG:
-		mat_copy(thro_config, 3, value);
+		mat_copy(thro_config, 3, (float*)value);
+		break;
+		case _CHANNEL_TRIM:
+		mat_copy(channel_trim, 3, (float*)value);
+		break;
+		case _CHANNEL_REVERSE:
+		*(int32_t*)value = channel_reverse;
+		break;
+		case _HEADING_PID:
+		mat_copy(heading_pid, 3, (float*)value);
+		break;
+		case _ALTITUDE_PID:
+		mat_copy(altitude_pid, 3, (float*)value);
 		break;
 		default:
 		break;
@@ -526,4 +582,12 @@ void ack_error_flush_restart() {
 void wireless_flush_restart() {
 	wireless_flush();
 	wireless_rx_dma_start();
+}
+
+void enable_kalman_orientation_update() {
+	nav_uart_send(0x89);
+}
+
+void disable_kalman_orientation_update() {
+	nav_uart_send(0x8A);
 }
