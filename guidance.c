@@ -43,7 +43,7 @@ float position_pid[3];
 float heading_pid[3];
 float altitude_pid[3];
 
-extern float test;
+extern bool kalman_orientation_update_enabled;
 
 
 Point origin_point;
@@ -411,7 +411,7 @@ void reset_guidance() {
 	//pitch = 0;
 //}
 
-void guidance_auto(float* position, float* orientation, bool* set_origin) {
+void guidance_auto_waypoint(float* position, float* orientation, bool* set_origin) {
 	static uint32_t previous_time = 0;
 	// get current time
 	uint32_t current_time = read_timer_20ns();
@@ -459,8 +459,6 @@ void guidance_auto(float* position, float* orientation, bool* set_origin) {
 	// calculate distance between current position and line in 2d (negative is left of line)
 	float position_offset = ((target_point.bit[0] - origin_point.bit[0]) * (origin_point.bit[1] - position[1]) -
 		(origin_point.bit[0] - position[0]) * (target_point.bit[1] - origin_point.bit[1])) / vec_2_length(line_vector);
-		
-	test = position_offset;
 		
 	
 	// run PID on position offset
@@ -522,14 +520,37 @@ void guidance_auto(float* position, float* orientation, bool* set_origin) {
 		previous_error = error;
 	}
 	
-	pitch = 0;
+	// run PID on altitude
+	{
+		// error points UP
+		float error = position[2] - target_point.bit[2];
+		static float previous_error = 0;
+		static float integral = 0;
+		
+		// proportional
+		float proportional = error;
+		
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+		
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+		
+		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+		
+		previous_error = error;
+	}
+	
+	//pitch = 0;
 	
 	control(roll, pitch, orientation);
 	
-	char buffer[192];
-	sprintf(buffer, "origin %f %f %f\ntarget %f %f %f\nonce %s, setorigin %s\nposition offset %f\npos off pid %f\nline heading %f\n\n", origin_point.bit[0], origin_point.bit[1], origin_point.bit[2], target_point.bit[0], target_point.bit[1], target_point.bit[2],
-		(once) ? "true" : "false", (*set_origin) ? "true" : "false", position_offset, position_offset_pid, line_heading);
-	serial_print(buffer);
+	//char buffer[192];
+	//sprintf(buffer, "origin %f %f %f\ntarget %f %f %f\nonce %s, setorigin %s\nposition offset %f\npos off pid %f\nline heading %f\n\n", origin_point.bit[0], origin_point.bit[1], origin_point.bit[2], target_point.bit[0], target_point.bit[1], target_point.bit[2],
+		//(once) ? "true" : "false", (*set_origin) ? "true" : "false", position_offset, position_offset_pid, line_heading);
+	//serial_print(buffer);
 }
 
 void guidance_manual(PWM_in* pwm_in, float* orientation) {
@@ -552,7 +573,7 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) {
 	control(roll, pitch, orientation);
 }
 
-void guidance_manual_heading_hold(PWM_in* pwm_in, float* orientation) {
+void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orientation, bool* set_origin) {
 	static uint32_t previous_time = 0;
 	// get current time
 	uint32_t current_time = read_timer_20ns();
@@ -565,13 +586,20 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* orientation) {
 	
 	
 	static float heading_lock = 0.0f;
+	static float altitude_lock = 0.0f;
 	float roll = 0.0f, pitch = 0.0f;
 	
-	static bool kalman_orientation_update_enabled = false;
+	if (*set_origin) {
+		heading_lock = orientation[2];
+		altitude_lock = position[2];
+		*set_origin = false;
+	}
+	
+	//static bool kalman_orientation_update_enabled = false;
 	if (ABS(pwm_in->ale) > 0.05) {
 		if (kalman_orientation_update_enabled) {
 			disable_kalman_orientation_update();
-			kalman_orientation_update_enabled = false;
+			//kalman_orientation_update_enabled = false;
 		}
 		
 		roll = pwm_in->ale * 30;
@@ -579,9 +607,10 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* orientation) {
 	else {
 		if (!kalman_orientation_update_enabled) {
 			enable_kalman_orientation_update();
-			kalman_orientation_update_enabled = true;
+			//kalman_orientation_update_enabled = true;
 			// set heading lock
 			heading_lock = orientation[2];
+			altitude_lock = position[2];
 		}
 		
 		// run PID on heading
@@ -589,27 +618,52 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* orientation) {
 		if (heading_lock > measured_heading + 180) measured_heading += 360;
 		if (heading_lock < measured_heading - 180) measured_heading -= 360;
 		
-		float error = heading_lock - measured_heading;
-		static float previous_error = 0;
-		static float integral = 0;
+		{
+			float error = heading_lock - measured_heading;
+			static float previous_error = 0;
+			static float integral = 0;
+			
+			// proportional
+			float proportional = error;
+			
+			// integral
+			float error_dt = error * i_time;
+			integral += error_dt;
+			
+			// derivative
+			float delta_error = error - previous_error;
+			float derivative = delta_error / i_time;
+			
+			roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			
+			previous_error = error;
+		}
 		
-		// proportional
-		float proportional = error;
-		
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-		
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-		
-		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-		
-		previous_error = error;
+		// run PID on altitude
+		{
+			// error points UP
+			float error = position[2] - altitude_lock;
+			static float previous_error = 0;
+			static float integral = 0;
+			
+			// proportional
+			float proportional = error;
+			
+			// integral
+			float error_dt = error * i_time;
+			integral += error_dt;
+			
+			// derivative
+			float delta_error = error - previous_error;
+			float derivative = delta_error / i_time;
+			
+			pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			
+			previous_error = error;
+		}
 	}
 	
-	pitch = pwm_in->elev * 15;
+	//pitch = pwm_in->elev * 15;
 	
 	control(roll, pitch, orientation);
 }

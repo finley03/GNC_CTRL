@@ -27,6 +27,8 @@ typedef enum {
 	_CHANNEL_REVERSE,
 	_HEADING_PID,
 	_ALTITUDE_PID,
+	_ELEVATOR_TURN_P,
+	_FLIGHT_MODE,
 	
 	_CTRL_VOLATILE_PARAM_START = 8192,
 	
@@ -111,6 +113,9 @@ void wireless_flush_restart();
 
 void enable_kalman_orientation_update();
 void disable_kalman_orientation_update();
+
+
+void FAILSAFE();
 
 
 #define NAV_DEVICE_ID 0xd5d5

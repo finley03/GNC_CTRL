@@ -24,6 +24,8 @@
 #define EEPROM_CHANNEL_REVERSE 0x1070 // int32 (packed booleans)
 #define EEPROM_HEADING_PID 0x1074 // vec3
 #define EEPROM_ALTITUDE_PID 0x1080 // vec3
+#define EEPROM_ELEVATOR_TURN_P 0x108C // scalar
+#define EEPROM_FLIGHT_MODE 0x1090 // scalar
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 

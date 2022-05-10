@@ -25,10 +25,13 @@ CTRL_ACK_Packet ctrl_ack_packet;
 bool nav_poll;
 bool guidance_run;
 bool arm;
-// true if origin should be set (when guidance begins / resumes)
+// true if origin should be set (when guidance begins / resumes) / heading hold
 bool set_origin;
 
-float test;
+bool kalman_orientation_update_enabled;
+
+int flight_mode;
+int last_flight_mode;
 
 #ifdef TEST
 static float position[3] = {0, -2, -2};
@@ -66,49 +69,27 @@ int main(void) {
 		}
 		// run guidance routine
 		else {
-			//static float target_orientation[3] = {0, 0, 0};
-			//static float roll, pitch;
 			float measured_position[3] = { nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z };
 			float measured_orientation[3] = { nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z };
-			//control(0, 0, measured_orientation);
-			//guidance_manual(&pwm_in, measured_orientation);
-			//guidance_manual_heading_hold(&pwm_in, measured_orientation);
-			if (guidance_run) guidance_auto(measured_position, measured_orientation, &set_origin);
 			
-			nav_data_packet.bit.debug1 = test;
+			//if (guidance_run) guidance_auto(measured_position, measured_orientation, &set_origin);
+			if (flight_mode != last_flight_mode) {
+				set_origin = true;
+				last_flight_mode = flight_mode;
+			}
 			
-			//if (guidance_run) {
-				////#ifdef TEST
-				////static float position[3] = {0, -2, -2};
-				//#ifndef TEST
-				//float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
-				//#endif
-				//
-				//float target_vector[3];
-				//guidance(position, target_orientation, target_vector);
-				//
-				//#ifdef TEST
-				//mat_scalar_product(target_vector, i_time, 3, target_vector);
-				//mat_add(position, target_vector, 3, position);
-				//#endif
-			//}
-			
-			//if (guidance_run) {
-				//float position[3] = {nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z};
-				//
-				//guidance(position, nav_data_packet.bit.orientation_z, &roll, &pitch);
-			//}
-			//
-			//float measured_orientation[3] = {nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z};
-			//float measured_acceleration[3] = {nav_data_packet.bit.accelraw_x, nav_data_packet.bit.accelraw_y, nav_data_packet.bit.accelraw_z};
-			//_control(target_orientation, measured_orientation);
-			////control(roll, pitch, measured_orientation, measured_acceleration, 8.0f);
-		
-			#ifdef TEST
-			nav_data_packet.bit.position_x = position[0];
-			nav_data_packet.bit.position_y = position[1];
-			nav_data_packet.bit.position_z = position[2];
-			#endif
+			switch (flight_mode) {
+				case FLIGHT_MODE_MANUAL:
+				guidance_manual(&pwm_in, measured_orientation);
+				break;
+				case FLIGHT_MODE_MANUAL_HEADING_HOLD:
+				guidance_manual_heading_hold(&pwm_in, measured_position, measured_orientation, &set_origin);
+				break;
+				case FLIGHT_MODE_AUTO_WAYPOINT:
+				if (guidance_run) guidance_auto_waypoint(measured_position, measured_orientation, &set_origin);
+				else control_passthrough(&pwm_in);
+				break;
+			}
 		}
 		
 		txc_wireless_data();
@@ -724,12 +705,16 @@ void txc_wireless_data() {
 			
 			// enable kalman orientation update step
 			case 0x0086:
-			nav_uart_send(0x89);
+			//nav_uart_send(0x89);
+			//kalman_orientation_update_enabled = true;
+			enable_kalman_orientation_update();
 			break;
 			
 			// disable kalman orientation update step
 			case 0x0087:
-			nav_uart_send(0x8A);
+			//nav_uart_send(0x8A);
+			//kalman_orientation_update_enabled = false;
+			disable_kalman_orientation_update();
 			break;
 			
 			// calibrate gyroscope
@@ -800,9 +785,12 @@ void init() {
 	control_load_values();
 	reset_guidance();
 	
-	nav_poll = false;
+	nav_poll = true;
 	guidance_run = false;
 	set_origin = true;
+	kalman_orientation_update_enabled = true;
+	
+	last_flight_mode = flight_mode;
 	
 	//ack_ok();
 	LED_OFF();

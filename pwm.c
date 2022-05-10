@@ -73,7 +73,7 @@ void pwm_init_out() {
 	while (TCC0->SYNCBUSY.bit.PER);
 	
 	// set duty cycle to middle for init
-	TCC0->CC[0].bit.CC = PWM_DUTY_MID;
+	TCC0->CC[0].bit.CC = PWM_DUTY_MIN; // throttle channel, min required
 	while (TCC0->SYNCBUSY.bit.CC0);
 	TCC0->CC[1].bit.CC = PWM_DUTY_MID;
 	while (TCC0->SYNCBUSY.bit.CC1);

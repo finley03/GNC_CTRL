@@ -15,6 +15,11 @@ extern float channel_trim[3];
 extern int32_t channel_reverse;
 extern float heading_pid[3];
 extern float altitude_pid[3];
+extern float elevator_turn_p;
+extern int flight_mode;
+
+extern bool kalman_orientation_update_enabled;
+extern bool arm;
 
 
 void LED_print_8(uint8_t data) {
@@ -145,6 +150,8 @@ void control_load_values() {
 	control_load_value(_CHANNEL_REVERSE);
 	control_load_value(_HEADING_PID);
 	control_load_value(_ALTITUDE_PID);
+	control_load_value(_ELEVATOR_TURN_P);
+	control_load_value(_FLIGHT_MODE);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -206,6 +213,12 @@ void control_load_value(CTRL_Param parameter) {
 		case _ALTITUDE_PID:
 		spi_eeprom_read_n(EEPROM_ALTITUDE_PID, altitude_pid, VEC3_SIZE);
 		break;
+		case _ELEVATOR_TURN_P:
+		spi_eeprom_read_n(EEPROM_ELEVATOR_TURN_P, &elevator_turn_p, SCALAR_SIZE);
+		break;
+		case _FLIGHT_MODE:
+		spi_eeprom_read_n(EEPROM_FLIGHT_MODE, &flight_mode, INT32_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -251,6 +264,12 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _ALTITUDE_PID:
 		spi_eeprom_write_n_s(EEPROM_ALTITUDE_PID, altitude_pid, VEC3_SIZE);
+		break;
+		case _ELEVATOR_TURN_P:
+		spi_eeprom_write_n_s(EEPROM_ELEVATOR_TURN_P, &elevator_turn_p, SCALAR_SIZE);
+		break;
+		case _FLIGHT_MODE:
+		spi_eeprom_write_n_s(EEPROM_FLIGHT_MODE, &flight_mode, INT32_SIZE);
 		break;
 		default:
 		break;
@@ -420,6 +439,12 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _ALTITUDE_PID:
 		mat_copy((float*)value, 3, altitude_pid);
 		break;
+		case _ELEVATOR_TURN_P:
+		elevator_turn_p = *(float*)value;
+		break;
+		case _FLIGHT_MODE:
+		flight_mode = *(int*)value;
+		break;
 		default:
 		break;
 	}
@@ -465,6 +490,12 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _ALTITUDE_PID:
 		mat_copy(altitude_pid, 3, (float*)value);
+		break;
+		case _ELEVATOR_TURN_P:
+		*(float*)value = elevator_turn_p;
+		break;
+		case _FLIGHT_MODE:
+		*(int*)value = flight_mode;
 		break;
 		default:
 		break;
@@ -586,8 +617,19 @@ void wireless_flush_restart() {
 
 void enable_kalman_orientation_update() {
 	nav_uart_send(0x89);
+	kalman_orientation_update_enabled = true;
 }
 
 void disable_kalman_orientation_update() {
 	nav_uart_send(0x8A);
+	kalman_orientation_update_enabled = false;
+}
+
+
+void FAILSAFE() {
+	// disable motor
+	arm = false;
+	pwm_write(PWM_WRITE_THRO, -1.0f);
+	
+	// add more
 }

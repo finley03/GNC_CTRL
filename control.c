@@ -13,6 +13,7 @@ float mix_mat[9];
 float thro_config[3];
 float channel_trim[3];
 int32_t channel_reverse;
+float elevator_turn_p;
 
 extern bool arm;
 
@@ -128,6 +129,14 @@ void control(float roll, float pitch, float* orientation) {
 	// calculate throttle
 	float thro = thro_config[0] * 2 - 1;
 	thro += thro_config[1] * pitch / 90;
+	
+	// calculate up elevator for turn
+	float extra_elevator = 1.0f;
+	if (cosx != 0) {
+		extra_elevator = ((1.0f / cosx) - 1.0f) * elevator_turn_p;
+		extra_elevator = MIN_2(1.0f, extra_elevator);
+	}
+	output[1] += extra_elevator * 90;
 	
 	// mix output value channels
 	float mixed_output[3];
