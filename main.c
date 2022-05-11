@@ -33,6 +33,8 @@ bool kalman_orientation_update_enabled;
 int flight_mode;
 int last_flight_mode;
 
+int32_t ctrl_flags_1;
+
 #ifdef TEST
 static float position[3] = {0, -2, -2};
 #endif
@@ -61,11 +63,14 @@ int main(void) {
 		
 		// get pwm values
 		PWM_in pwm_in = pwm_read();
+		// check if failsafe is enabled
+		if (pwm_in.thro < -1.15f / 1.3f) FAILSAFE();
 		// check if override is set
-		//if (PWM_BOOL(pwm_in.ovr)) pwm_write_all(pwm_in);
 		if (PWM_BOOL(pwm_in.ovr)) {
 			control_passthrough(&pwm_in);
 			set_origin = true;
+			control_disable_integral();
+			if (!kalman_orientation_update_enabled) enable_kalman_orientation_update();
 		}
 		// run guidance routine
 		else {
@@ -75,6 +80,7 @@ int main(void) {
 			//if (guidance_run) guidance_auto(measured_position, measured_orientation, &set_origin);
 			if (flight_mode != last_flight_mode) {
 				set_origin = true;
+				control_disable_integral();
 				last_flight_mode = flight_mode;
 			}
 			
@@ -104,13 +110,7 @@ void txc_nav_data() {
 		
 	nav_read_timed(nav_data_packet.reg, sizeof(nav_data_packet.reg));
 	
-	// assume internal communications are okay	
-	
-	//if (crc32(nav_data_packet.reg, sizeof(nav_data_packet.reg)) != CRC32_CHECK) {
-		////serial_print("CRC Check Failed\n");
-		//REG_PORT_OUTSET1 = LED;
-		//while(1);
-	//}
+	// assume internal communications are okay
 }
 
 
@@ -657,11 +657,11 @@ void txc_wireless_data() {
 				
 				nav_read(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg));
 				
-				if (crc32(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg)) != CRC32_CHECK) {
-					//serial_print("CRC Check Failed\n");
-					LED_ON();
-					while(1);
-				}
+				//if (crc32(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg)) != CRC32_CHECK) {
+					////serial_print("CRC Check Failed\n");
+					//LED_ON();
+					//while(1);
+				//}
 				
 				wireless_stream(nav_selftest_packet.reg, sizeof(nav_selftest_packet.reg));
 				end_ack_packet = false;
@@ -731,12 +731,12 @@ void txc_wireless_data() {
 			break;
 			
 			default:
-			{
-				//delay_ms(1);
-				serial_send(command);
-				LED_ON();
-				while(1);
-			}
+			//{
+				////delay_ms(1);
+				//serial_send(command);
+				//LED_ON();
+				//while(1);
+			//}
 			break;
 		}
 		

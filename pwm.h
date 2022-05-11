@@ -11,6 +11,10 @@
 #define PWM_DUTY_RANGE (PWM_DUTY_MAX - PWM_DUTY_MIN)
 #define PWM_DUTY_HALF_RANGE (PWM_DUTY_RANGE / 2)
 
+#define PWM_DUTY_HALF_RANGE_THROTTLE (PWM_DUTY_HALF_RANGE / 1.25f) // 1.25 to account for any analog errors
+#define PWM_DUTY_MAX_THROTTLE (PWM_DUTY_MID + PWM_DUTY_HALF_RANGE)
+#define PWM_DUTY_MIN_THROTTLE (PWM_DUTY_MID - PWM_DUTY_HALF_RANGE)
+
 #define PWM_OUTPUT_CHANNELS 4
 #define PWM_WRITE_THRO 0
 #define PWM_WRITE_ALE 1
@@ -44,6 +48,9 @@ typedef struct {
 void pwm_init_out();
 // writes to PWM channel and accepts value between +1 and -1
 void pwm_write(uint8_t channel, float position);
+
+// write different values for throttle
+void pwm_write_thro(float position);
 
 void pwm_write_all(PWM_in value);
 

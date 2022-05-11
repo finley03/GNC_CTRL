@@ -15,12 +15,14 @@ float channel_trim[3];
 int32_t channel_reverse;
 float elevator_turn_p;
 
+bool disable_integral;
 extern bool arm;
 
 
 void control_write(float thro, float ale, float elev, float rudd) {
 	// trim channels
-	float throttle = (arm) ? thro : -1.0f;
+	//float throttle = (arm) ? thro : -1.0f;
+	float throttle = thro;
 	float aileron = ale + channel_trim[0];
 	float elevator = elev + channel_trim[1];
 	float rudder = rudd + channel_trim[2];
@@ -31,7 +33,8 @@ void control_write(float thro, float ale, float elev, float rudd) {
 	if (channel_reverse & CHANNEL_REVERSE_RUDDER_MASK) rudder = -rudder;
 	
 	// output values
-	pwm_write(PWM_WRITE_THRO, throttle);
+	//pwm_write(PWM_WRITE_THRO, throttle);
+	pwm_write_thro(throttle);
 	pwm_write(PWM_WRITE_ALE, aileron);
 	pwm_write(PWM_WRITE_ELEV, elevator);
 	pwm_write(PWM_WRITE_RUDD, rudder);
@@ -95,7 +98,9 @@ void control(float roll, float pitch, float* orientation) {
 	
 	// integral
 	float error_dt[3];
-	mat_scalar_product(error, i_time, 3, error_dt);
+	float integral_time = (disable_integral) ? 0 : i_time;
+	disable_integral = false;
+	mat_scalar_product(error, integral_time, 3, error_dt);
 	mat_add(integral, error_dt, 3, integral);
 	
 	// derivative
@@ -152,8 +157,13 @@ void control(float roll, float pitch, float* orientation) {
 }
 
 
+void control_disable_integral() {
+	disable_integral = true;
+}
+
+
 void control_passthrough(PWM_in* pwm_in) {
-	control_write(pwm_in->thro, pwm_in->ale, pwm_in->elev, pwm_in->rudd);
+	control_write(pwm_in->thro * 1.3f, pwm_in->ale, pwm_in->elev, pwm_in->rudd);
 	//// trim channels
 	//float throttle = (arm) ? pwm_in->thro : -1.0f;
 	//float aileron = pwm_in->ale + channel_trim[0];

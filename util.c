@@ -2,6 +2,7 @@
 #include "spi_eeprom.h"
 #include "uart.h"
 #include "dma.h"
+#include "pwm.h"
 
 
 extern float PID_X[3];
@@ -17,6 +18,8 @@ extern float heading_pid[3];
 extern float altitude_pid[3];
 extern float elevator_turn_p;
 extern int flight_mode;
+extern float disable_kalman_update_delay;
+extern int32_t ctrl_flags_1;
 
 extern bool kalman_orientation_update_enabled;
 extern bool arm;
@@ -152,6 +155,8 @@ void control_load_values() {
 	control_load_value(_ALTITUDE_PID);
 	control_load_value(_ELEVATOR_TURN_P);
 	control_load_value(_FLIGHT_MODE);
+	control_load_value(_DISABLE_KALMAN_UPDATE_DELAY);
+	control_load_value(_CTRL_FLAGS_1);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -219,6 +224,12 @@ void control_load_value(CTRL_Param parameter) {
 		case _FLIGHT_MODE:
 		spi_eeprom_read_n(EEPROM_FLIGHT_MODE, &flight_mode, INT32_SIZE);
 		break;
+		case _DISABLE_KALMAN_UPDATE_DELAY:
+		spi_eeprom_read_n(EEPROM_DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, SCALAR_SIZE);
+		break;
+		case _CTRL_FLAGS_1:
+		spi_eeprom_read_n(EEPROM_CTRL_FLAGS_1, &ctrl_flags_1, INT32_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -270,6 +281,12 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _FLIGHT_MODE:
 		spi_eeprom_write_n_s(EEPROM_FLIGHT_MODE, &flight_mode, INT32_SIZE);
+		break;
+		case _DISABLE_KALMAN_UPDATE_DELAY:
+		spi_eeprom_write_n_s(EEPROM_DISABLE_KALMAN_UPDATE_DELAY, &disable_kalman_update_delay, SCALAR_SIZE);
+		break;
+		case _CTRL_FLAGS_1:
+		spi_eeprom_write_n_s(EEPROM_CTRL_FLAGS_1, &ctrl_flags_1, INT32_SIZE);
 		break;
 		default:
 		break;
@@ -445,6 +462,12 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _FLIGHT_MODE:
 		flight_mode = *(int*)value;
 		break;
+		case _DISABLE_KALMAN_UPDATE_DELAY:
+		disable_kalman_update_delay = *(float*)value;
+		break;
+		case _CTRL_FLAGS_1:
+		ctrl_flags_1 = *(int32_t*)value;
+		break;
 		default:
 		break;
 	}
@@ -497,6 +520,12 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		case _FLIGHT_MODE:
 		*(int*)value = flight_mode;
 		break;
+		case _DISABLE_KALMAN_UPDATE_DELAY:
+		*(float*)value = disable_kalman_update_delay;
+		break;
+		case _CTRL_FLAGS_1:
+		*(int32_t*)value = ctrl_flags_1;
+		break;
 		default:
 		break;
 	}
@@ -516,8 +545,10 @@ void nav_set_vec3(CTRL_Param parameter, float* value) {
 		nav_stream(set_request.reg, sizeof(set_request.reg));
 	}
 	else {
-		LED_ON();
-		while(1);
+		//LED_ON();
+		//while(1);
+		
+		// do nothing
 	}
 }
 
@@ -536,8 +567,10 @@ void nav_read_vec3(CTRL_Param parameter, float* value) {
 		mat_copy(read_packet.bit.data, 3, value);
 	}
 	else {
-		LED_ON();
-		while(1);
+		//LED_ON();
+		//while(1);
+		
+		// do nothing
 	}
 }
 
@@ -554,8 +587,10 @@ void nav_set_scalar(CTRL_Param parameter, float* value) {
 		nav_stream(set_request.reg, sizeof(set_request.reg));
 	}
 	else {
-		LED_ON();
-		while(1);
+		//LED_ON();
+		//while(1);
+		
+		// do nothing
 	}
 }
 
@@ -574,8 +609,10 @@ void nav_read_scalar(CTRL_Param parameter, float* value) {
 		*value = read_packet.bit.data;
 	}
 	else {
-		LED_ON();
-		while(1);
+		//LED_ON();
+		//while(1);
+		
+		// do nothing
 	}
 }
 
@@ -629,7 +666,7 @@ void disable_kalman_orientation_update() {
 void FAILSAFE() {
 	// disable motor
 	arm = false;
-	pwm_write(PWM_WRITE_THRO, -1.0f);
+	pwm_write_thro(-1.0f);
 	
 	// add more
 }

@@ -32,6 +32,8 @@
 #define BREAK_WHILE 0x20
 #define END 0x21
 
+#define ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
+
 typedef union {
 	float bit[3];
 
@@ -44,16 +46,17 @@ float heading_pid[3];
 float altitude_pid[3];
 
 extern bool kalman_orientation_update_enabled;
-
+int32_t ctrl_flags_1;
 
 Point origin_point;
 Point target_point;
-Point previous_origin_point;
+//Point previous_origin_point;
 float target_plane_normal[3];
-float target_line_point[3];
-float target_line_vector[3];
+//float target_line_point[3];
+//float target_line_vector[3];
 
 float waypoint_threshold;
+float disable_kalman_update_delay;
 
 static bool once;
 
@@ -108,8 +111,10 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 			break;
 			
 		default:
-			REG_PORT_OUTSET1 = LED;
-			while(1);
+			//REG_PORT_OUTSET1 = LED;
+			//while(1);
+			// trigger failsafe, program flow broken
+			FAILSAFE();
 			break;
 		}
 	}
@@ -137,7 +142,7 @@ bool run_code(bool reset) {
 		switch (spi_eeprom_read_byte(address)) {
 		case POINT:
 		{
-			mat_copy(origin_point.bit, 3, previous_origin_point.bit);
+			//mat_copy(origin_point.bit, 3, previous_origin_point.bit);
 			mat_copy(target_point.bit, 3, origin_point.bit);
 			//for (uint8_t i = 0; i < 3; ++i) {
 				//origin.bit[i] = target.bit[i];
@@ -394,8 +399,10 @@ bool run_code(bool reset) {
 		default:
 			//printf("Unrecognized command %02X at address %08X\n", code[address], address);
 			++address;
-			REG_PORT_OUTSET1 = LED;
-			while(1);
+			//REG_PORT_OUTSET1 = LED;
+			//while(1);
+			// program flow broken, trigger failsafe
+			FAILSAFE();
 		break;
 		}
 	}
@@ -438,13 +445,36 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	}
 	
 	{ // scoped so variables are deleted
+		static uint32_t waypoint_start_time;
+		uint32_t waypoint_current_time;
+				
 		// get vector from position to target
 		float position_target_vector[3];
 		mat_subtract(target_point.bit, position, 3, position_target_vector);
 		// check if waypoint has been reached
-		if (vec_2_length(position_target_vector) <= waypoint_threshold) {
+		
+		// if the waypoint is missed and the plane goes past it, count it as hit
+		float waypoint_dotp = mat_dotp(target_point.bit, target_plane_normal, 3);
+		float current_dotp = mat_dotp(position, target_plane_normal, 3);
+		
+		if (vec_2_length(position_target_vector) <= waypoint_threshold || current_dotp > waypoint_dotp) {
 			// set next waypoint
 			run_code(false);
+			// disable kalman orientation update if flag is set
+			if (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
+				disable_kalman_orientation_update();
+				waypoint_start_time = read_timer_20ns();
+			}
+		}
+		
+		// reenable orientation update
+		if (!kalman_orientation_update_enabled && (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
+			waypoint_current_time = read_timer_20ns();
+			uint32_t waypoint_delta_time = waypoint_current_time - waypoint_start_time;
+			float waypoint_time = (float)waypoint_delta_time * TIMER_S_MULTIPLIER;
+			if (waypoint_time >= MIN_2(80.0f, disable_kalman_update_delay)) { // 80 seconds is near the max for a 32 bit unsigned int
+				enable_kalman_orientation_update();
+			}
 		}
 	}
 	
@@ -553,18 +583,20 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	//serial_print(buffer);
 }
 
-void guidance_manual(PWM_in* pwm_in, float* orientation) {
-	static bool kalman_orientation_update_enabled = false;
-	if (ABS(pwm_in->ale) > 0.05) {
-		if (kalman_orientation_update_enabled) {
-			disable_kalman_orientation_update();
-			kalman_orientation_update_enabled = false;
+void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HERE WITH KALMAN UPDATE - MUST FIX LATER OR WILL FORGET IT EXISTS
+	//static bool kalman_orientation_update_enabled = false;
+	if (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
+		if (ABS(pwm_in->ale) > 0.05) {
+			if (kalman_orientation_update_enabled) {
+				disable_kalman_orientation_update();
+				//kalman_orientation_update_enabled = false;
+			}
 		}
-	}
-	else {
-		if (!kalman_orientation_update_enabled) {
-			enable_kalman_orientation_update();
-			kalman_orientation_update_enabled = true;
+		else {
+			if (!kalman_orientation_update_enabled) {
+				enable_kalman_orientation_update();
+				//kalman_orientation_update_enabled = true;
+			}
 		}
 	}
 	
@@ -596,8 +628,8 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	}
 	
 	//static bool kalman_orientation_update_enabled = false;
-	if (ABS(pwm_in->ale) > 0.05) {
-		if (kalman_orientation_update_enabled) {
+	if (ABS(pwm_in->ale) > 0.05f) {
+		if (kalman_orientation_update_enabled && (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
 			disable_kalman_orientation_update();
 			//kalman_orientation_update_enabled = false;
 		}
@@ -610,7 +642,6 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 			//kalman_orientation_update_enabled = true;
 			// set heading lock
 			heading_lock = orientation[2];
-			altitude_lock = position[2];
 		}
 		
 		// run PID on heading
@@ -637,6 +668,18 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 			roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
 			
 			previous_error = error;
+		}
+	}
+	
+	static bool altitude_once = true;
+	if (ABS(pwm_in->elev) > 0.05f) {
+		pitch = pwm_in->elev * 15;
+		altitude_once = true;
+	}
+	else {
+		if (altitude_once) {
+			altitude_lock = position[2];
+			altitude_once = false;
 		}
 		
 		// run PID on altitude

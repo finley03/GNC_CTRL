@@ -29,6 +29,8 @@ typedef enum {
 	_ALTITUDE_PID,
 	_ELEVATOR_TURN_P,
 	_FLIGHT_MODE,
+	_DISABLE_KALMAN_UPDATE_DELAY,
+	_CTRL_FLAGS_1,
 	
 	_CTRL_VOLATILE_PARAM_START = 8192,
 	
@@ -63,7 +65,7 @@ typedef enum {
 
 #define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
-#define MIN_2(a, b) ((b > a) ? a : b);
+#define MIN_2(a, b) ((b > a) ? a : b)
 #define MAX_3(a, b, c) (MAX_2(MAX_2(a, b), c))
 #define MIN_3(a, b, c) (MIN_2(MIN_2(a, b), c))
 #define UMAX_2(a, b) MAX_2(ABS(a), ABS(b))

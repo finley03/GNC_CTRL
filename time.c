@@ -142,3 +142,21 @@ float read_timer_ms() {
 float read_timer_s() {
 	return (float) TC4->COUNT32.COUNT.reg * TIMER_S_MULTIPLIER;
 }
+
+
+void frame_delay() {
+	static uint32_t previous_time = 0;
+	// get current time
+	uint32_t current_time = TIMER_REG;
+	// calculate time difference
+	uint32_t delta_time = current_time - previous_time;
+	// reset previous time
+	previous_time = current_time;
+	// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
+	
+	if (delta_time < FRAME_TIME_C) {
+		uint32_t cycles = FRAME_TIME_C - delta_time;
+		delay_8c(cycles / 8);
+	}
+}

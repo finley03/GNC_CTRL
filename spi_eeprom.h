@@ -26,6 +26,8 @@
 #define EEPROM_ALTITUDE_PID 0x1080 // vec3
 #define EEPROM_ELEVATOR_TURN_P 0x108C // scalar
 #define EEPROM_FLIGHT_MODE 0x1090 // scalar
+#define EEPROM_DISABLE_KALMAN_UPDATE_DELAY 0x1094 // scalar
+#define EEPROM_CTRL_FLAGS_1 0x1098 // int32 (packed booleans)
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 

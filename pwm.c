@@ -23,6 +23,22 @@ void pwm_write(uint8_t channel, float position) {
 	TCC0->CC[channel].bit.CC = pwm_val;
 }
 
+void pwm_write_thro(float position) {
+	uint32_t pwm_val;
+	if (arm) {
+		// calculate PWM value
+		pwm_val = position * PWM_DUTY_HALF_RANGE + PWM_DUTY_MID;
+	
+		// check value is in range
+		pwm_val = (pwm_val <= PWM_DUTY_MAX) ? pwm_val : PWM_DUTY_MAX;
+		pwm_val = (pwm_val >= PWM_DUTY_MIN) ? pwm_val : PWM_DUTY_MIN;
+	}
+	else pwm_val = PWM_DUTY_MIN;
+	
+	// write to pwm channel
+	TCC0->CC[PWM_WRITE_THRO].bit.CC = pwm_val;
+}
+
 void pwm_write_all(PWM_in value) {
 	// calculate pwm values
 	uint32_t thro = value.thro * PWM_DUTY_HALF_RANGE + PWM_DUTY_MID;
@@ -73,7 +89,7 @@ void pwm_init_out() {
 	while (TCC0->SYNCBUSY.bit.PER);
 	
 	// set duty cycle to middle for init
-	TCC0->CC[0].bit.CC = PWM_DUTY_MIN; // throttle channel, min required
+	TCC0->CC[0].bit.CC = PWM_DUTY_MIN_THROTTLE; // throttle channel, min required
 	while (TCC0->SYNCBUSY.bit.CC0);
 	TCC0->CC[1].bit.CC = PWM_DUTY_MID;
 	while (TCC0->SYNCBUSY.bit.CC1);
