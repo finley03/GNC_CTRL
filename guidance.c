@@ -57,6 +57,8 @@ float target_plane_normal[3];
 
 float waypoint_threshold;
 float disable_kalman_update_delay;
+extern float roll_limit;
+extern float pitch_limit;
 
 static bool once;
 
@@ -201,7 +203,7 @@ bool run_code(bool reset) {
 		case ENDFOR:
 		{
 			--stack[stack_pointer - 1];
-			if (stack[stack_pointer - 1 != 0]) {
+			if (stack[stack_pointer - 1] != 0) {
 				address = stack[stack_pointer];
 			}
 			else {
@@ -600,8 +602,8 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HER
 		}
 	}
 	
-	float roll = pwm_in->ale * 30;
-	float pitch = pwm_in->elev * 15;
+	float roll = pwm_in->ale * roll_limit;
+	float pitch = pwm_in->elev * pitch_limit;
 	control(roll, pitch, orientation);
 }
 
@@ -634,7 +636,7 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 			//kalman_orientation_update_enabled = false;
 		}
 		
-		roll = pwm_in->ale * 30;
+		roll = pwm_in->ale * roll_limit;
 	}
 	else {
 		if (!kalman_orientation_update_enabled) {
@@ -673,7 +675,7 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	
 	static bool altitude_once = true;
 	if (ABS(pwm_in->elev) > 0.05f) {
-		pitch = pwm_in->elev * 15;
+		pitch = pwm_in->elev * pitch_limit;
 		altitude_once = true;
 	}
 	else {

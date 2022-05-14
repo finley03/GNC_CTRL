@@ -28,6 +28,9 @@
 #define EEPROM_FLIGHT_MODE 0x1090 // scalar
 #define EEPROM_DISABLE_KALMAN_UPDATE_DELAY 0x1094 // scalar
 #define EEPROM_CTRL_FLAGS_1 0x1098 // int32 (packed booleans)
+#define EEPROM_AOA 0x109C // scalar
+#define EEPROM_ROLL_LIMIT 0x10A0 // scalar
+#define EEPROM_PITCH_LIMIT 0x10A4 // scalar
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 

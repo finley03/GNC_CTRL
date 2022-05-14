@@ -14,6 +14,9 @@ float thro_config[3];
 float channel_trim[3];
 int32_t channel_reverse;
 float elevator_turn_p;
+float angle_of_attack;
+float roll_limit;
+float pitch_limit;
 
 bool disable_integral;
 extern bool arm;
@@ -53,15 +56,21 @@ void control(float roll, float pitch, float* orientation) {
 	float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
 	// limit roll and pitch values
-	if (roll > 30) roll = 30;
-	else if (roll < -30) roll = -30;
-	if (pitch > 15) pitch = 15;
-	else if (pitch < -15) pitch = -15;
+	if (roll > roll_limit) roll = roll_limit;
+	else if (roll < -roll_limit) roll = -roll_limit;
+	if (pitch > pitch_limit) pitch = pitch_limit;
+	else if (pitch < -pitch_limit) pitch = -pitch_limit;
 	
 	// correct values so orientation goes correct way
 	if (orientation[0] > roll + 180) roll += 360;
 	if (orientation[0] < roll - 180) roll -= 360;
 	
+	// calculate throttle
+	float thro = thro_config[0] * 2 - 1;
+	thro += thro_config[1] * pitch / 90;
+	
+	// correct for angle of attack
+	pitch += angle_of_attack;
 	
 	// calculate difference between set orientation and actual orientation
 	float world_error[3];
@@ -130,10 +139,6 @@ void control(float roll, float pitch, float* orientation) {
 	
 	// reset previous error
 	mat_copy(error, 3, previous_error);
-	
-	// calculate throttle
-	float thro = thro_config[0] * 2 - 1;
-	thro += thro_config[1] * pitch / 90;
 	
 	// calculate up elevator for turn
 	float extra_elevator = 1.0f;

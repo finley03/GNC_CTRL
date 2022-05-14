@@ -3,8 +3,6 @@
 
 #include "util.h"
 
-//#define TEST
-
 typedef enum {
 	FLIGHT_MODE_MANUAL,
 	FLIGHT_MODE_MANUAL_HEADING_HOLD,

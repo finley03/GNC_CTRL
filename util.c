@@ -20,6 +20,9 @@ extern float elevator_turn_p;
 extern int flight_mode;
 extern float disable_kalman_update_delay;
 extern int32_t ctrl_flags_1;
+extern float angle_of_attack;
+extern float roll_limit;
+extern float pitch_limit;
 
 extern bool kalman_orientation_update_enabled;
 extern bool arm;
@@ -157,6 +160,9 @@ void control_load_values() {
 	control_load_value(_FLIGHT_MODE);
 	control_load_value(_DISABLE_KALMAN_UPDATE_DELAY);
 	control_load_value(_CTRL_FLAGS_1);
+	control_load_value(_AOA);
+	control_load_value(_ROLL_LIMIT);
+	control_load_value(_PITCH_LIMIT);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -230,6 +236,15 @@ void control_load_value(CTRL_Param parameter) {
 		case _CTRL_FLAGS_1:
 		spi_eeprom_read_n(EEPROM_CTRL_FLAGS_1, &ctrl_flags_1, INT32_SIZE);
 		break;
+		case _AOA:
+		spi_eeprom_read_n(EEPROM_AOA, &angle_of_attack, SCALAR_SIZE);
+		break;
+		case _ROLL_LIMIT:
+		spi_eeprom_read_n(EEPROM_ROLL_LIMIT, &roll_limit, SCALAR_SIZE);
+		break;
+		case _PITCH_LIMIT:
+		spi_eeprom_read_n(EEPROM_PITCH_LIMIT, &pitch_limit, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -287,6 +302,15 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _CTRL_FLAGS_1:
 		spi_eeprom_write_n_s(EEPROM_CTRL_FLAGS_1, &ctrl_flags_1, INT32_SIZE);
+		break;
+		case _AOA:
+		spi_eeprom_write_n_s(EEPROM_AOA, &angle_of_attack, SCALAR_SIZE);
+		break;
+		case _ROLL_LIMIT:
+		spi_eeprom_write_n_s(EEPROM_ROLL_LIMIT, &roll_limit, SCALAR_SIZE);
+		break;
+		case _PITCH_LIMIT:
+		spi_eeprom_write_n_s(EEPROM_PITCH_LIMIT, &pitch_limit, SCALAR_SIZE);
 		break;
 		default:
 		break;
@@ -468,6 +492,15 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _CTRL_FLAGS_1:
 		ctrl_flags_1 = *(int32_t*)value;
 		break;
+		case _AOA:
+		angle_of_attack = *(float*)value;
+		break;
+		case _ROLL_LIMIT:
+		roll_limit = *(float*)value;
+		break;
+		case _PITCH_LIMIT:
+		pitch_limit = *(float*)value;
+		break;
 		default:
 		break;
 	}
@@ -525,6 +558,15 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _CTRL_FLAGS_1:
 		*(int32_t*)value = ctrl_flags_1;
+		break;
+		case _AOA:
+		*(float*)value = angle_of_attack;
+		break;
+		case _ROLL_LIMIT:
+		*(float*)value = roll_limit;
+		break;
+		case _PITCH_LIMIT:
+		*(float*)value = pitch_limit;
 		break;
 		default:
 		break;

@@ -44,16 +44,18 @@ int main(void) {
 	init();
 
 	while(1) {
-		delay_ms(20);
-		static uint32_t previous_time = 0;
-		// get current time
-		uint32_t current_time = read_timer_20ns();
-		// calculate time difference
-		uint32_t delta_time = current_time - previous_time;
-		// reset previous time
-		previous_time = current_time;
-		// convert previous time to float
-		float i_time = delta_time * TIMER_S_MULTIPLIER;
+		//delay_ms(20);
+		frame_delay();
+		
+		//static uint32_t previous_time = 0;
+		//// get current time
+		//uint32_t current_time = read_timer_20ns();
+		//// calculate time difference
+		//uint32_t delta_time = current_time - previous_time;
+		//// reset previous time
+		//previous_time = current_time;
+		//// convert previous time to float
+		//float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
 		if (nav_poll) {
 			LED_ON();
@@ -161,11 +163,7 @@ void txc_wireless_data() {
 			// reset guidance
 			case 0x0002:
 			reset_guidance();
-			#ifdef TEST
-			position[0] = 0;
-			position[1] = -2;
-			position[2] = -2;
-			#endif
+			set_origin = true;
 			break;
 			
 			// start guidance
