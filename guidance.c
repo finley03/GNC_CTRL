@@ -145,7 +145,8 @@ bool run_code(bool reset) {
 		case POINT:
 		{
 			//mat_copy(origin_point.bit, 3, previous_origin_point.bit);
-			mat_copy(target_point.bit, 3, origin_point.bit);
+			// only copy if route is not being reset
+			if (!reset) mat_copy(target_point.bit, 3, origin_point.bit);
 			//for (uint8_t i = 0; i < 3; ++i) {
 				//origin.bit[i] = target.bit[i];
 			//}
@@ -436,8 +437,8 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	float roll = 0.0f, pitch = 0.0f;
 	
 	if (once) {
-		run_code(true);
 		mat_copy(position, 3, origin_point.bit);
+		run_code(true);
 		once = false;
 	}
 	
@@ -629,6 +630,10 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 		*set_origin = false;
 	}
 	
+	// set to true when turning
+	// used to detect when to reset heading lock
+	static bool end_turn = false;
+	
 	//static bool kalman_orientation_update_enabled = false;
 	if (ABS(pwm_in->ale) > 0.05f) {
 		if (kalman_orientation_update_enabled && (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
@@ -637,13 +642,18 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 		}
 		
 		roll = pwm_in->ale * roll_limit;
+		end_turn = true;
 	}
 	else {
 		if (!kalman_orientation_update_enabled) {
 			enable_kalman_orientation_update();
 			//kalman_orientation_update_enabled = true;
 			// set heading lock
+		}
+		
+		if (end_turn) {
 			heading_lock = orientation[2];
+			end_turn = false;
 		}
 		
 		// run PID on heading
