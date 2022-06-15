@@ -24,11 +24,13 @@ CTRL_ACK_Packet ctrl_ack_packet;
 
 bool nav_poll;
 bool guidance_run;
-bool arm;
+bool armed;
 // true if origin should be set (when guidance begins / resumes) / heading hold
 bool set_origin;
 
 bool kalman_orientation_update_enabled;
+
+int flight_mode_0, flight_mode_1, flight_mode_2;
 
 int flight_mode;
 int last_flight_mode;
@@ -67,13 +69,45 @@ int main(void) {
 		PWM_in pwm_in = pwm_read();
 		// check if failsafe is enabled
 		if (pwm_in.thro < -1.15f / 1.3f) FAILSAFE();
-		// check if override is set
-		if (PWM_BOOL(pwm_in.ovr)) {
-			control_passthrough(&pwm_in);
-			set_origin = true;
-			control_disable_integral();
-			if (!kalman_orientation_update_enabled) enable_kalman_orientation_update();
+		//// check if override is set
+		//if (PWM_BOOL(pwm_in.ovr)) {
+			//control_passthrough(&pwm_in);
+			//set_origin = true;
+			//control_disable_integral();
+			//if (!kalman_orientation_update_enabled) enable_kalman_orientation_update();
+		//}
+		
+		// check if aircraft is armed
+		// only arm/disarm on change
+		static bool last_aux2 = true;
+		bool aux2 = PWM_BOOL(pwm_in.aux2);
+		if (aux2 != last_aux2) {
+			aux2 ? arm() : disarm();
+			
+			last_aux2 = aux2;
 		}
+		
+		// set flight mode
+		static int last_aux1 = -1;
+		int aux1 = pwm_enum(pwm_in.aux1, 3);
+		if (aux1 != last_aux1) {
+			switch (aux1) {
+				case 0:
+				flight_mode = flight_mode_0;
+				break;
+				case 1:
+				flight_mode = flight_mode_1;
+				break;
+				case 2:
+				flight_mode = flight_mode_2;
+				break;
+				default:
+				break;
+			}
+			
+			last_aux1 = aux1;
+		}
+		
 		// run guidance routine
 		else {
 			float measured_position[3] = { nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z };
@@ -86,16 +120,41 @@ int main(void) {
 				last_flight_mode = flight_mode;
 			}
 			
+			//switch (flight_mode) {
+				//case FLIGHT_MODE_MANUAL:
+				//guidance_manual(&pwm_in, measured_orientation);
+				//break;
+				//case FLIGHT_MODE_MANUAL_HEADING_HOLD:
+				//guidance_manual_heading_hold(&pwm_in, measured_position, measured_orientation, &set_origin);
+				//break;
+				//case FLIGHT_MODE_AUTO_WAYPOINT:
+				//if (guidance_run) guidance_auto_waypoint(measured_position, measured_orientation, &set_origin);
+				//else control_passthrough(&pwm_in);
+				//break;
+			//}
+			
 			switch (flight_mode) {
 				case FLIGHT_MODE_MANUAL:
+				control_passthrough(&pwm_in);
+				set_origin = true;
+				control_disable_integral();
+				if (!kalman_orientation_update_enabled) enable_kalman_orientation_update();
+				break;
+				
+				case FLIGHT_MODE_FBW:
 				guidance_manual(&pwm_in, measured_orientation);
 				break;
-				case FLIGHT_MODE_MANUAL_HEADING_HOLD:
+				
+				case FLIGHT_MODE_FBWH:
 				guidance_manual_heading_hold(&pwm_in, measured_position, measured_orientation, &set_origin);
 				break;
-				case FLIGHT_MODE_AUTO_WAYPOINT:
+				
+				case FLIGHT_MODE_AUTO:
 				if (guidance_run) guidance_auto_waypoint(measured_position, measured_orientation, &set_origin);
 				else control_passthrough(&pwm_in);
+				break;
+				
+				default:
 				break;
 			}
 		}
@@ -177,14 +236,16 @@ void txc_wireless_data() {
 			guidance_run = false;
 			break;
 			
-			// motor arm
+			// arm
 			case 0x0005:
-			arm = true;
+			//arm = true;
+			arm();
 			break;
 			
-			// motor disarm
+			// disarm
 			case 0x0006:
-			arm = false;
+			//arm = false;
+			disarm();
 			break;
 						
 			// eeprom read byte
@@ -759,6 +820,9 @@ void init() {
 	LED_ON();
 	
 	set_clock_48m();
+	
+	armed = false;
+	
 	init_timer();
 	start_timer();
 	crc_init();
@@ -784,7 +848,7 @@ void init() {
 	reset_guidance();
 	
 	nav_poll = true;
-	guidance_run = false;
+	guidance_run = true;
 	set_origin = true;
 	kalman_orientation_update_enabled = true;
 	

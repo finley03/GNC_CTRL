@@ -5,7 +5,7 @@
 static uint32_t port_in_state[12];
 static uint32_t pwm_in_time[12];
 static uint_fast8_t pwm_in_index;
-extern bool arm;
+extern bool armed;
 
 
 void pwm_write(uint8_t channel, float position) {
@@ -25,7 +25,7 @@ void pwm_write(uint8_t channel, float position) {
 
 void pwm_write_thro(float position) {
 	uint32_t pwm_val;
-	if (arm) {
+	if (armed) {
 		// calculate PWM value
 		pwm_val = position * PWM_DUTY_HALF_RANGE + PWM_DUTY_MID;
 	
@@ -61,7 +61,7 @@ void pwm_write_all(PWM_in value) {
 	
 	// write to pwm channels
 	// check throttle channel is armed
-	TCC0->CC[PWM_WRITE_THRO].bit.CC = (arm) ? thro : PWM_DUTY_MIN;
+	TCC0->CC[PWM_WRITE_THRO].bit.CC = (armed) ? thro : PWM_DUTY_MIN;
 	TCC0->CC[PWM_WRITE_ALE].bit.CC = ale;
 	TCC0->CC[PWM_WRITE_ELEV].bit.CC = elev;
 	TCC0->CC[PWM_WRITE_RUDD].bit.CC = rudd;
@@ -218,11 +218,11 @@ PWM_in pwm_read() {
 				time_int[3] = pwm_in_time[i + 1] - pwm_in_time[i];
 				break;
 				
-			case PWM_IN_AUX_MASK:
+			case PWM_IN_AUX1_MASK:
 				time_int[4] = pwm_in_time[i + 1] - pwm_in_time[i];
 				break;
 				
-			case PWM_IN_OVR_MASK:
+			case PWM_IN_AUX2_MASK:
 				time_int[5] = pwm_in_time[i + 1] - pwm_in_time[i];
 				break;
 				
@@ -246,14 +246,20 @@ PWM_in pwm_read() {
 			ret.ale = (float)((int32_t) time_int[1] - PWM_DUTY_MID) * pwm_mult;
 			ret.elev = (float)((int32_t) time_int[2] - PWM_DUTY_MID) * pwm_mult;
 			ret.rudd = (float)((int32_t) time_int[3] - PWM_DUTY_MID) * pwm_mult;
-			ret.aux = (float)((int32_t) time_int[4] - PWM_DUTY_MID) * pwm_mult;
-			ret.ovr = (float)((int32_t) time_int[5] - PWM_DUTY_MID) * pwm_mult;
+			ret.aux1 = (float)((int32_t) time_int[4] - PWM_DUTY_MID) * pwm_mult;
+			ret.aux2 = (float)((int32_t) time_int[5] - PWM_DUTY_MID) * pwm_mult;
 		}
 	}
 	
 	EIC->INTFLAG.reg = EIC->INTFLAG.reg;
 	
 	return ret;
+}
+
+int pwm_enum(float val, int count) {
+	val = (val + 1) * 0.5;
+	val *= count - 1;
+	return (int)(val + 0.5);
 }
 
 void EIC_Handler() {

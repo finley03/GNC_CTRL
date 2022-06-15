@@ -25,8 +25,8 @@
 #define PWM_IN_ALE_MASK PORT_PA03
 #define PWM_IN_ELEV_MASK PORT_PA04
 #define PWM_IN_RUDD_MASK PORT_PA05
-#define PWM_IN_AUX_MASK PORT_PA06
-#define PWM_IN_OVR_MASK PORT_PA07
+#define PWM_IN_AUX1_MASK PORT_PA06
+#define PWM_IN_AUX2_MASK PORT_PA07
 #define PWM_IN_MASK (PORT_PA02 | PORT_PA03 | PORT_PA04 | PORT_PA05 | PORT_PA06 | PORT_PA07)
 
 #define PWM_INPUT_CHANNELS 6
@@ -39,8 +39,8 @@ typedef struct {
 	float ale; // aileron channel
 	float elev; // elevator channel
 	float rudd; // rudder channel
-	float aux; // aux channel
-	float ovr; // override channel
+	float aux1; // aux channel 1
+	float aux2; // aux channel 2
 } PWM_in;
 
 // pwm output on PA14 to PA17
@@ -58,5 +58,7 @@ void pwm_init_in();
 
 // doesn't really read data, just interprets already existing data
 PWM_in pwm_read();
+
+int pwm_enum(float val, int count);
 
 #endif

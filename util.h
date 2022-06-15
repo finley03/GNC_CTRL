@@ -34,6 +34,9 @@ typedef enum {
 	_AOA,
 	_ROLL_LIMIT,
 	_PITCH_LIMIT,
+	_FLIGHT_MODE_0,
+	_FLIGHT_MODE_1,
+	_FLIGHT_MODE_2,
 	
 	_CTRL_VOLATILE_PARAM_START = 8192,
 	
@@ -64,7 +67,7 @@ typedef enum {
 #define LED PORT_PB11
 #define LED_ON() (REG_PORT_OUTSET1 = LED)
 #define LED_OFF() (REG_PORT_OUTCLR1 = LED)
-#define LED_TOGGLE() (REG_PORT_OUTTGL0 = LED)
+#define LED_TOGGLE() (REG_PORT_OUTTGL1 = LED)
 
 #define ABS(a) ((a < 0) ? -(a) : a)
 #define MAX_2(a, b) ((a > b) ? a : b)
@@ -119,6 +122,9 @@ void wireless_flush_restart();
 void enable_kalman_orientation_update();
 void disable_kalman_orientation_update();
 
+
+void arm();
+void disarm();
 
 void FAILSAFE();
 

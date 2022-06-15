@@ -19,7 +19,7 @@ float roll_limit;
 float pitch_limit;
 
 bool disable_integral;
-extern bool arm;
+extern bool armed;
 
 
 void control_write(float thro, float ale, float elev, float rudd) {

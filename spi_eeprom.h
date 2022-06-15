@@ -31,6 +31,9 @@
 #define EEPROM_AOA 0x109C // scalar
 #define EEPROM_ROLL_LIMIT 0x10A0 // scalar
 #define EEPROM_PITCH_LIMIT 0x10A4 // scalar
+#define EEPROM_FLIGHT_MODE_0 0x10A8 // scalar
+#define EEPROM_FLIGHT_MODE_1 0x10AC // scalar
+#define EEPROM_FLIGHT_MODE_2 0x10B0 // scalar
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 
