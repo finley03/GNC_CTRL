@@ -33,6 +33,7 @@
 #define END 0x21
 
 #define ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
+#define LOITER_CW_MASK (1 << 1)
 
 typedef union {
 	float bit[3];
@@ -47,6 +48,9 @@ float altitude_pid[3];
 
 extern bool kalman_orientation_update_enabled;
 int32_t ctrl_flags_1;
+
+float loiter_radius;
+float home_loiter_alt;
 
 Point origin_point;
 Point target_point;
@@ -576,14 +580,7 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 		previous_error = error;
 	}
 	
-	//pitch = 0;
-	
 	control(roll, pitch, orientation);
-	
-	//char buffer[192];
-	//sprintf(buffer, "origin %f %f %f\ntarget %f %f %f\nonce %s, setorigin %s\nposition offset %f\npos off pid %f\nline heading %f\n\n", origin_point.bit[0], origin_point.bit[1], origin_point.bit[2], target_point.bit[0], target_point.bit[1], target_point.bit[2],
-		//(once) ? "true" : "false", (*set_origin) ? "true" : "false", position_offset, position_offset_pid, line_heading);
-	//serial_print(buffer);
 }
 
 void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HERE WITH KALMAN UPDATE - MUST FIX LATER OR WILL FORGET IT EXISTS
@@ -605,7 +602,7 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HER
 	
 	float roll = pwm_in->ale * roll_limit;
 	float pitch = pwm_in->elev * pitch_limit;
-	control(roll, pitch, orientation);
+	control_mthrottle(pwm_in->thro, roll, pitch, orientation);
 }
 
 void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orientation, bool* set_origin) {
@@ -723,191 +720,227 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	control(roll, pitch, orientation);
 }
 
-//void guidance(float* position, float* target_orientation, float* target_vector) {
-	//static uint32_t previous_time = 0;
-	//// get current time
-	//uint32_t current_time = read_timer_20ns();
-	//// calculate time difference
-	//uint32_t delta_time = current_time - previous_time;
-	//// reset previous time
-	//previous_time = current_time;
-	//// convert previous time to float
-	//float i_time = (float) delta_time * TIMER_S_MULTIPLIER;
-	//
-	////float ret = 0;
-	//// true if craft is turning to new way point
-	//static bool turn = false;
-	//
-	//// run read function once on init
-	////static bool once = true;
-	//if (once) {
-		//// load first point
-		//run_code(true);
-		//// load second point
-		//run_code(false);
-		//once = false;
-		//turn = false;
-		//ENABLE_KALMAN_ORIENTATION_UPDATE();
-	//}
-	//
-	//static float average_velocity = 0;
-	//{
-		//static float last_position[3] = {0, 0, 0};
-		//float path_vector[3];
-		//float path_length;
-		//const float measurement_time = 5;
-		//mat_subtract(position, last_position, 3, path_vector);
-		//path_length = vec_3_length(path_vector);
-		//float velocity = path_length / i_time;
-		//average_velocity = average_velocity + ((velocity - average_velocity) * i_time / measurement_time);
-		//mat_copy(position, 3, last_position);
-	//}
-	//
-	////const float waypoint_threshold = 1;
-	//
-	//// turn parameters
-	//static float turn_center[3];
-	//static float turn_start[3];
-	//static float turn_end[3];
-	//static float turn_angle;
-	//static float turn_radius;
-	//static float turn_axis[3];
-	//
-	//float roll_angle;
-	//
-	//// if not turning continuously check whether craft has reached way point
-	//if (!turn) {
-		//float target_dotp_value = mat_dotp(target_point.bit, target_plane_normal, 3);
-	//
-		//// find distance from point to target plane
-		//// negative when moving towards origin
-		//float position_target_dotp_value = mat_dotp(position, target_plane_normal, 3);
-		//
-		//mat_copy(origin_point.bit, 3, target_line_point);
-		//mat_copy(target_plane_normal, 3, target_line_vector);
-		//
-		//roll_angle = 0;
-	//
-		//// if distance is less than 15 (> -15) get new point
-		//if (position_target_dotp_value >= target_dotp_value - waypoint_threshold) {
-			//run_code(false);
-			//turn = true;
-			//DISABLE_KALMAN_ORIENTATION_UPDATE();
-			//
-			//// assign turn parameters
-			//float waypoint_turn_start_vector[3];
-			//mat_subtract(previous_origin_point.bit, origin_point.bit, 3, waypoint_turn_start_vector);
-			//vec_3_normalize(waypoint_turn_start_vector, waypoint_turn_start_vector);
-			//mat_scalar_product(waypoint_turn_start_vector, waypoint_threshold, 3, waypoint_turn_start_vector);
-			//
-			//float waypoint_turn_end_vector[3];
-			//mat_subtract(target_point.bit, origin_point.bit, 3, waypoint_turn_end_vector);
-			//vec_3_normalize(waypoint_turn_end_vector, waypoint_turn_end_vector);
-			//mat_scalar_product(waypoint_turn_end_vector, waypoint_threshold, 3, waypoint_turn_end_vector);
-			//
-			//turn_angle = 180 - degrees(acos(mat_dotp(waypoint_turn_start_vector, waypoint_turn_end_vector, 3) / (waypoint_threshold * waypoint_threshold)));
-			//float waypoint_turn_center_distance = waypoint_threshold / sin(radians(turn_angle) / 2);
-			//
-			//float waypoint_turn_center_vector[3];
-			//mat_add(waypoint_turn_start_vector, waypoint_turn_end_vector, 3, waypoint_turn_center_vector);
-			//vec_3_normalize(waypoint_turn_center_vector, waypoint_turn_center_vector);
-			//mat_scalar_product(waypoint_turn_center_vector, waypoint_turn_center_distance, 3, waypoint_turn_center_vector);
-			//
-			//// assign turn center
-			//mat_add(origin_point.bit, waypoint_turn_center_vector, 3, turn_center);
-			//// assign turn start
-			//mat_add(origin_point.bit, waypoint_turn_start_vector, 3, turn_start);
-			//// assign turn end
-			//mat_add(origin_point.bit, waypoint_turn_end_vector, 3, turn_end);
-			//// assign turn radius
-			//turn_radius = waypoint_threshold / tan(radians(turn_angle) / 2);
-			//// assign turn axis unnormalized
-			//mat_crossp(waypoint_turn_end_vector, waypoint_turn_start_vector, turn_axis);
-		//}
-	//}
-	//// separate if statement to enable execution if turn is set true in previous statement
-	//if (turn) {
-		//// get vector from turn center to current position
-		//float turn_center_position[3];
-		//mat_subtract(position, turn_center, 3, turn_center_position);
-		//
-		//// get vector from turn center to turn start
-		//float turn_center_start[3];
-		//mat_subtract(turn_start, turn_center, 3, turn_center_start);
-		//
-		//// get angle round turn
-		//float angle_round_turn = degrees(acos(mat_dotp(turn_center_start, turn_center_position, 3) / (turn_radius * vec_3_length(turn_center_position))));
-		//
-		//float target_angle;
-		//if (angle_round_turn >= turn_angle - 1) {
-			//turn = false;
-			//ENABLE_KALMAN_ORIENTATION_UPDATE();
-			//target_angle = turn_angle;
-		//}
-		//else {
-			//// calculate a target angle for next iteration
-			//// use rolling average velocity to calculate
-			//target_angle = angle_round_turn + degrees(atan(average_velocity * i_time / turn_radius));
-		//}
-		////ret = 1;
-		//
-		//// calculate position vector of target line
-		//float turn_center_target_point[3];
-		//vec_rotate_axis(turn_center_start, turn_axis, radians(target_angle), turn_center_target_point);
-		//mat_add(turn_center, turn_center_target_point, 3, target_line_point);
-		//
-		//// calculate target vector of target line
-		//// target vector for start of turn
-		//float turn_start_target_vector[3];
-		//mat_subtract(origin_point.bit, turn_start, 3, turn_start_target_vector);
-		//vec_rotate_axis(turn_start_target_vector, turn_axis, radians(target_angle), target_line_vector);
-		//vec_3_normalize(target_line_vector, target_line_vector);
-		//
-		//// calculate roll angle
-		//// down vector
-		//static float down[3] = {0, 0, 1};
-		//// horizontal acceleration
-		//float horizontal_accel = (average_velocity * average_velocity) / turn_radius;
-		//horizontal_accel = (mat_dotp(down, turn_axis, 3) >= 0) ? horizontal_accel : -horizontal_accel;
-		//// calculate roll angle
-		//roll_angle = degrees(atan(horizontal_accel / _STD_G));
-	//}
-	//
-	//
-	//// vector from line point to current position
-	//float line_point_position_vector[3];
-	//mat_subtract(position, target_line_point, 3, line_point_position_vector);
-	//// distance from line point to position when projected on to target line
-	//float line_position_projected = mat_dotp(line_point_position_vector, target_line_vector, 3);
-	//// vector from line point to position projected onto target line
-	//float line_position_projected_vector[3];
-	//mat_scalar_product(target_line_vector, line_position_projected, 3, line_position_projected_vector);
-	//// absolute location of position projected to line
-	//float position_projected_vector[3];
-	//mat_add(target_line_point, line_position_projected_vector, 3, position_projected_vector);
-	//// calculate offset vector
-	//float offset_vector[3];
-	//mat_subtract(position_projected_vector, position, 3, offset_vector);
-	//
-	//// scale offset vector to add to target vector
-	//mat_scalar_product(offset_vector, position_pid[0], 3, offset_vector);
-	//
-	//// add to target plane normal to get target vector
-	//mat_add(target_line_vector, offset_vector, 3, target_vector);
-	//
-	//// normalize target vector
-	//vec_3_normalize(target_vector, target_vector);
-	//
-	//// calculate target orientation
-	//float down_vector[3] = {0, 0, 1};
-	//float east_vector[3] = {0, 1, 0};
-	//float down_target_normal[3]; // local east
-	//mat_crossp(down_vector, target_vector, down_target_normal);
-	//vec_3_normalize(down_target_normal, down_target_normal);
-	//// roll axis
-	//target_orientation[0] = roll_angle;
-	//// pitch axis
-	//target_orientation[1] = degrees(vec_3_angle(down_vector, target_vector)) - 90;
-	//// yaw axis
-	//target_orientation[2] = degrees(vec_3_angle_signed(east_vector, down_target_normal, down_vector));
-//}
+
+void guidance_loiter(float* position, float* orientation, bool* set_origin) {
+	static uint32_t previous_time = 0;
+	// get current time
+	uint32_t current_time = read_timer_20ns();
+	// calculate time difference
+	uint32_t delta_time = current_time - previous_time;
+	// reset previous time
+	previous_time = current_time;
+	// convert previous time to float
+	float i_time = delta_time * TIMER_S_MULTIPLIER;
+		
+		
+	float target_heading = 0.0f;
+	float roll = 0.0f, pitch = 0.0f;
+	
+	static float loiter_point[3];
+		
+	if (*set_origin) {
+		mat_copy(position, 3, loiter_point);
+		*set_origin = false;
+	}
+	
+	float point_position_vector[2];
+	mat_subtract(position, loiter_point, 2, point_position_vector);
+	
+	float position_offset = vec_2_length(point_position_vector) - loiter_radius;
+	
+	position_offset = (ctrl_flags_1 & LOITER_CW_MASK) ? -position_offset : position_offset;
+		
+	// run PID on position offset
+	float position_offset_pid;
+	{
+		float error = position_offset;
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		position_offset_pid = proportional * position_pid[0] + integral * position_pid[1] + derivative * position_pid[2];
+			
+		previous_error = error;
+	}
+		
+	// get line heading
+	float complex line_complex;
+	if (ctrl_flags_1 & LOITER_CW_MASK) line_complex = CMPLXF(point_position_vector[1], -point_position_vector[0]);
+	else line_complex = CMPLXF(-point_position_vector[1], point_position_vector[0]);
+	//float complex line_complex = CMPLXF(line_vector[0], line_vector[1]);
+	float line_heading = degrees(cargf(line_complex));
+		
+	// set target heading
+	target_heading = line_heading + degrees(atanf(radians(position_offset_pid)));
+		
+	if (target_heading > 180) target_heading -= 360;
+	if (target_heading <= -180) target_heading += 360;
+		
+	// run PID on heading
+	float measured_heading = orientation[2];
+	if (measured_heading > target_heading + 180) target_heading += 360;
+	if (measured_heading < target_heading - 180) target_heading -= 360;
+		
+	{
+		float error = target_heading - measured_heading;
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			
+		previous_error = error;
+	}
+		
+	// run PID on altitude
+	{
+		// error points UP
+		float error = position[2] - loiter_point[2];
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			
+		previous_error = error;
+	}
+		
+	control(roll, pitch, orientation);
+}
+
+void guidance_rtl(float* position, float* orientation) {
+	static uint32_t previous_time = 0;
+	// get current time
+	uint32_t current_time = read_timer_20ns();
+	// calculate time difference
+	uint32_t delta_time = current_time - previous_time;
+	// reset previous time
+	previous_time = current_time;
+	// convert previous time to float
+	float i_time = delta_time * TIMER_S_MULTIPLIER;
+		
+		
+	float target_heading = 0.0f;
+	float roll = 0.0f, pitch = 0.0f;
+		
+	float position_offset = vec_2_length(position) - loiter_radius;
+		
+	position_offset = (ctrl_flags_1 & LOITER_CW_MASK) ? -position_offset : position_offset;
+		
+	// run PID on position offset
+	float position_offset_pid;
+	{
+		float error = position_offset;
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		position_offset_pid = proportional * position_pid[0] + integral * position_pid[1] + derivative * position_pid[2];
+			
+		previous_error = error;
+	}
+		
+	// get line heading
+	float complex line_complex;
+	if (ctrl_flags_1 & LOITER_CW_MASK) line_complex = CMPLXF(position[1], -position[0]);
+	else line_complex = CMPLXF(-position[1], position[0]);
+	//float complex line_complex = CMPLXF(line_vector[0], line_vector[1]);
+	float line_heading = degrees(cargf(line_complex));
+		
+	// set target heading
+	target_heading = line_heading + degrees(atanf(radians(position_offset_pid)));
+		
+	if (target_heading > 180) target_heading -= 360;
+	if (target_heading <= -180) target_heading += 360;
+		
+	// run PID on heading
+	float measured_heading = orientation[2];
+	if (measured_heading > target_heading + 180) target_heading += 360;
+	if (measured_heading < target_heading - 180) target_heading -= 360;
+		
+	{
+		float error = target_heading - measured_heading;
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			
+		previous_error = error;
+	}
+		
+	// run PID on altitude
+	{
+		// error points UP
+		float error = position[2] - home_loiter_alt;
+		static float previous_error = 0;
+		static float integral = 0;
+			
+		// proportional
+		float proportional = error;
+			
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+			
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+			
+		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			
+		previous_error = error;
+	}
+		
+	control(roll, pitch, orientation);
+}

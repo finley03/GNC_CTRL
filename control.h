@@ -8,6 +8,7 @@
 //void _control(float* set, float* measured);
 // control algorithm
 void control(float roll, float pitch, float* orientation);
+void control_mthrottle(float thro, float roll, float pitch, float* orientation);
 // disable integral from PID loops on next frame
 void control_disable_integral();
 // pass through values

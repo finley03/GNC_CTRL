@@ -25,9 +25,12 @@ extern float angle_of_attack;
 extern float roll_limit;
 extern float pitch_limit;
 extern int flight_mode_0, flight_mode_1, flight_mode_2;
+extern float loiter_radius;
+extern float home_loiter_alt;
 
 extern bool kalman_orientation_update_enabled;
 extern bool armed;
+extern bool set_origin;
 
 
 void LED_print_8(uint8_t data) {
@@ -168,6 +171,8 @@ void control_load_values() {
 	control_load_value(_FLIGHT_MODE_0);
 	control_load_value(_FLIGHT_MODE_1);
 	control_load_value(_FLIGHT_MODE_2);
+	control_load_value(_LOITER_RADIUS);
+	control_load_value(_HOME_LOITER_ALT);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -259,6 +264,12 @@ void control_load_value(CTRL_Param parameter) {
 		case _FLIGHT_MODE_2:
 		spi_eeprom_read_n(EEPROM_FLIGHT_MODE_2, &flight_mode_2, SCALAR_SIZE);
 		break;
+		case _LOITER_RADIUS:
+		spi_eeprom_read_n(EEPROM_LOITER_RADIUS, &loiter_radius, SCALAR_SIZE);
+		break;
+		case _HOME_LOITER_ALT:
+		spi_eeprom_read_n(EEPROM_HOME_LOITER_ALT, &home_loiter_alt, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -334,6 +345,12 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _FLIGHT_MODE_2:
 		spi_eeprom_write_n_s(EEPROM_FLIGHT_MODE_2, &flight_mode_2, SCALAR_SIZE);
+		break;
+		case _LOITER_RADIUS:
+		spi_eeprom_write_n_s(EEPROM_LOITER_RADIUS, &loiter_radius, SCALAR_SIZE);
+		break;
+		case _HOME_LOITER_ALT:
+		spi_eeprom_write_n_s(EEPROM_HOME_LOITER_ALT, &home_loiter_alt, SCALAR_SIZE);
 		break;
 		default:
 		break;
@@ -533,6 +550,12 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _FLIGHT_MODE_2:
 		flight_mode_2 = *(int*)value;
 		break;
+		case _LOITER_RADIUS:
+		loiter_radius = *(float*)value;
+		break;
+		case _HOME_LOITER_ALT:
+		home_loiter_alt = *(float*)value;
+		break;
 		default:
 		break;
 	}
@@ -608,6 +631,12 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _FLIGHT_MODE_2:
 		*(int*)value = flight_mode_2;
+		break;
+		case _LOITER_RADIUS:
+		*(float*)value = loiter_radius;
+		break;
+		case _HOME_LOITER_ALT:
+		*(float*)value = home_loiter_alt;
 		break;
 		default:
 		break;
@@ -749,12 +778,20 @@ void disable_kalman_orientation_update() {
 void arm() {
 	if (nav_data_packet.bit.h_acc < 50) {
 		armed = true;
+		set_origin = true;
 
-		// set launch position		
-		nav_set_scalar(_KALMAN_GNSS_ZEROLAT, &(nav_data_packet.bit.latitude));
-		nav_set_scalar(_KALMAN_GNSS_ZEROLONG, &(nav_data_packet.bit.longitude));
-		// enable kalman filter
-		nav_uart_send(0x87);
+		// disable kalman position
+		nav_uart_send(0x8D);
+		delay_ms(10);
+		// set launch position	
+		nav_uart_send(0x8E);
+		delay_ms(10);
+		// reset kalman uncertainties
+		nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
+		nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
+		delay_ms(10);
+		// enable kalman position
+		nav_uart_send(0x8C);
 	}
 }
 

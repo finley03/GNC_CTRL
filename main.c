@@ -85,6 +85,7 @@ int main(void) {
 			aux2 ? arm() : disarm();
 			
 			last_aux2 = aux2;
+			set_origin = true;
 		}
 		
 		// set flight mode
@@ -136,7 +137,6 @@ int main(void) {
 			switch (flight_mode) {
 				case FLIGHT_MODE_MANUAL:
 				control_passthrough(&pwm_in);
-				set_origin = true;
 				control_disable_integral();
 				if (!kalman_orientation_update_enabled) enable_kalman_orientation_update();
 				break;
@@ -152,6 +152,14 @@ int main(void) {
 				case FLIGHT_MODE_AUTO:
 				if (guidance_run) guidance_auto_waypoint(measured_position, measured_orientation, &set_origin);
 				else control_passthrough(&pwm_in);
+				break;
+				
+				case FLIGHT_MODE_LOITER:
+				guidance_loiter(measured_position, measured_orientation, &set_origin);
+				break;
+				
+				case FLIGHT_MODE_RTL:
+				guidance_rtl(measured_position, measured_orientation);
 				break;
 				
 				default:

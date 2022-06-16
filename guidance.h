@@ -17,4 +17,7 @@ void guidance_auto_waypoint(float* position, float* orientation, bool *set_origi
 void guidance_manual(PWM_in* pwm_in, float* orientation);
 void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orientation, bool* set_origin);
 
+void guidance_loiter(float* position, float* orientation, bool* set_origin);
+void guidance_rtl(float* position, float* orientation);
+
 #endif
