@@ -1,6 +1,7 @@
 #include "guidance.h"
 #include "spi_eeprom.h"
 #include "uart.h"
+#include "main.h"
 #include <complex.h>
 #define CMPLXF(x, y) ((float complex)((float)(x) + I * (float)(y)))
 
@@ -31,9 +32,11 @@
 #define ENDIF 0x19
 #define BREAK_WHILE 0x20
 #define END 0x21
+#define POINT_LLA 0x22
+#define LAUNCH 0x23
 
 #define ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
-#define LOITER_CW_MASK (1 << 1)
+#define LOITER_CCW_MASK (1 << 1)
 
 typedef union {
 	float bit[3];
@@ -65,6 +68,13 @@ extern float roll_limit;
 extern float pitch_limit;
 
 static bool once;
+
+float home_latitude, home_longitude, home_z;
+
+float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
+
+extern int flight_mode;
+extern int last_flight_mode;
 
 //void guidance_set_origin(float* value) {
 	//mat_copy(origin_point.bit, 3, value);
@@ -113,6 +123,7 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 			break;
 
 		case POINT:
+		case POINT_LLA:
 			*address += 13;
 			break;
 			
@@ -124,6 +135,13 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 			break;
 		}
 	}
+}
+
+void gps_cartesian(float latitude, float longitude, float* x, float* y) {
+	float multiplier = 111194.9266;
+
+	*x = (latitude - home_latitude) * multiplier;
+	*y = (longitude - home_longitude) * multiplier * cos(radians(latitude));
 }
 
 // returns false if end of code
@@ -157,6 +175,29 @@ bool run_code(bool reset) {
 			for (uint8_t i = 0; i < 12; ++i) {
 				target_point.reg[i] = spi_eeprom_read_byte(++address);
 			}
+			
+			mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
+			vec_3_normalize(target_plane_normal, target_plane_normal);
+			
+			++address;
+			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
+			run = false;
+		}
+		break;
+		case POINT_LLA:
+		{
+			// only copy if route is not being reset
+			if (!reset) mat_copy(target_point.bit, 3, origin_point.bit);
+			
+			Point lla;
+			
+			for (uint8_t i = 0; i < 12; ++i) {
+				lla.reg[i] = spi_eeprom_read_byte(++address);
+			}
+			
+			gps_cartesian(lla.bit[0], lla.bit[1], &(target_point.bit[0]), &(target_point.bit[1]));
+			
+			target_point.bit[2] = -lla.bit[2];
 			
 			mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
 			vec_3_normalize(target_plane_normal, target_plane_normal);
@@ -403,6 +444,12 @@ bool run_code(bool reset) {
 			++address;
 		}
 		break;
+		case LAUNCH:
+		{
+			set_flight_mode(FLIGHT_MODE_LAUNCH);
+			++address;
+		}
+		break;
 		default:
 			//printf("Unrecognized command %02X at address %08X\n", code[address], address);
 			++address;
@@ -493,7 +540,7 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	//float line_vector_2d_norm[2];
 	//vec_2_normalize(line_vector_2d, line_vector_2d_norm);
 	
-	// calculate distance between current position and line in 2d (negative is left of line)
+	// calculate distance between current position and line in 2d (negative is RIGHT of line)
 	float position_offset = ((target_point.bit[0] - origin_point.bit[0]) * (origin_point.bit[1] - position[1]) -
 		(origin_point.bit[0] - position[0]) * (target_point.bit[1] - origin_point.bit[1])) / vec_2_length(line_vector);
 		
@@ -602,7 +649,7 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HER
 	
 	float roll = pwm_in->ale * roll_limit;
 	float pitch = pwm_in->elev * pitch_limit;
-	control_mthrottle(pwm_in->thro, roll, pitch, orientation);
+	control_mthrottle(pwm_in->thro * 1.3f, roll, pitch, orientation);
 }
 
 void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orientation, bool* set_origin) {
@@ -748,7 +795,7 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 	
 	float position_offset = vec_2_length(point_position_vector) - loiter_radius;
 	
-	position_offset = (ctrl_flags_1 & LOITER_CW_MASK) ? -position_offset : position_offset;
+	position_offset = (ctrl_flags_1 & LOITER_CCW_MASK) ? -position_offset : position_offset;
 		
 	// run PID on position offset
 	float position_offset_pid;
@@ -775,9 +822,8 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 		
 	// get line heading
 	float complex line_complex;
-	if (ctrl_flags_1 & LOITER_CW_MASK) line_complex = CMPLXF(point_position_vector[1], -point_position_vector[0]);
+	if (ctrl_flags_1 & LOITER_CCW_MASK) line_complex = CMPLXF(point_position_vector[1], -point_position_vector[0]);
 	else line_complex = CMPLXF(-point_position_vector[1], point_position_vector[0]);
-	//float complex line_complex = CMPLXF(line_vector[0], line_vector[1]);
 	float line_heading = degrees(cargf(line_complex));
 		
 	// set target heading
@@ -855,7 +901,7 @@ void guidance_rtl(float* position, float* orientation) {
 		
 	float position_offset = vec_2_length(position) - loiter_radius;
 		
-	position_offset = (ctrl_flags_1 & LOITER_CW_MASK) ? -position_offset : position_offset;
+	position_offset = (ctrl_flags_1 & LOITER_CCW_MASK) ? -position_offset : position_offset;
 		
 	// run PID on position offset
 	float position_offset_pid;
@@ -882,9 +928,8 @@ void guidance_rtl(float* position, float* orientation) {
 		
 	// get line heading
 	float complex line_complex;
-	if (ctrl_flags_1 & LOITER_CW_MASK) line_complex = CMPLXF(position[1], -position[0]);
+	if (ctrl_flags_1 & LOITER_CCW_MASK) line_complex = CMPLXF(position[1], -position[0]);
 	else line_complex = CMPLXF(-position[1], position[0]);
-	//float complex line_complex = CMPLXF(line_vector[0], line_vector[1]);
 	float line_heading = degrees(cargf(line_complex));
 		
 	// set target heading
@@ -922,7 +967,7 @@ void guidance_rtl(float* position, float* orientation) {
 	// run PID on altitude
 	{
 		// error points UP
-		float error = position[2] - home_loiter_alt;
+		float error = position[2] + home_loiter_alt;
 		static float previous_error = 0;
 		static float integral = 0;
 			
@@ -943,4 +988,86 @@ void guidance_rtl(float* position, float* orientation) {
 	}
 		
 	control(roll, pitch, orientation);
+}
+
+
+void guidance_launch(float* position, float* orientation, float* velocity, float* acceleration, bool* set_origin) {
+	static uint32_t previous_time = 0;
+	// get current time
+	uint32_t current_time = read_timer_20ns();
+	// calculate time difference
+	uint32_t delta_time = current_time - previous_time;
+	// reset previous time
+	previous_time = current_time;
+	// convert previous time to float
+	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	
+	float heading_lock = 0.0f;
+	float roll = 0.0f;
+	
+	// true if currently launching
+	static bool launch = false;
+	// true when throttle is enabled
+	static bool thro = false;
+	
+	// reset launch mode
+	if (*set_origin) {
+		launch = false;
+		*set_origin = false;
+	}
+	
+	if (!launch) heading_lock = orientation[2];
+	
+	static uint32_t launch_start_time = 0;
+	static float time_since_launch = 0;
+	if (launch) time_since_launch = (float)(current_time - launch_start_time) * TIMER_S_MULTIPLIER;
+	else time_since_launch = 0;
+	
+	// quit launch mode
+	if (launch && time_since_launch >= launch_time) set_flight_mode(last_flight_mode);
+	
+	// check if acceleration is above minimum
+	if (!launch && acceleration[0] >= launch_minacc) {
+		// enable launch
+		launch = true;
+		
+		launch_start_time = current_time;
+	}
+	
+	if (time_since_launch >= launch_throdelay) {
+		if (launch && !thro && vec_3_length(velocity) >= launch_minspd) {
+			thro = true;
+		}
+		else {
+			launch = false;
+		}
+	}
+	
+	// run PID on heading
+	float measured_heading = orientation[2];
+	if (heading_lock > measured_heading + 180) measured_heading += 360;
+	if (heading_lock < measured_heading - 180) measured_heading -= 360;
+	
+	{
+		float error = heading_lock - measured_heading;
+		static float previous_error = 0;
+		static float integral = 0;
+		
+		// proportional
+		float proportional = error;
+		
+		// integral
+		float error_dt = error * i_time;
+		integral += error_dt;
+		
+		// derivative
+		float delta_error = error - previous_error;
+		float derivative = delta_error / i_time;
+		
+		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+		
+		previous_error = error;
+	}
+	
+	control_mthrottle((thro) ? launch_thro : -1.0f, roll, launch_pitch, orientation);
 }

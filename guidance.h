@@ -20,4 +20,7 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 void guidance_loiter(float* position, float* orientation, bool* set_origin);
 void guidance_rtl(float* position, float* orientation);
 
+void guidance_launch(float* position, float* orientation, float* velocity, float* acceleration, bool* set_origin);
+void guidance_land(float* position, float* orientation);
+
 #endif

@@ -28,6 +28,8 @@ bool armed;
 // true if origin should be set (when guidance begins / resumes) / heading hold
 bool set_origin;
 
+bool set_home;
+
 bool kalman_orientation_update_enabled;
 
 int flight_mode_0, flight_mode_1, flight_mode_2;
@@ -40,6 +42,10 @@ int32_t ctrl_flags_1;
 #ifdef TEST
 static float position[3] = {0, -2, -2};
 #endif
+
+extern float home_latitude;
+extern float home_longitude;
+extern float home_z;
 
 
 int main(void) {
@@ -63,6 +69,14 @@ int main(void) {
 			LED_ON();
 			txc_nav_data();
 			LED_OFF();
+		}
+		
+		// set home
+		if (set_home) {
+			home_latitude = nav_data_packet.bit.latitude;
+			home_longitude = nav_data_packet.bit.longitude;
+			home_z = nav_data_packet.bit.position_z;
+			set_home = false;
 		}
 		
 		// get pwm values
@@ -94,13 +108,16 @@ int main(void) {
 		if (aux1 != last_aux1) {
 			switch (aux1) {
 				case 0:
-				flight_mode = flight_mode_0;
+				//flight_mode = flight_mode_0;
+				set_flight_mode(flight_mode_0);
 				break;
 				case 1:
-				flight_mode = flight_mode_1;
+				//flight_mode = flight_mode_1;
+				set_flight_mode(flight_mode_1);
 				break;
 				case 2:
-				flight_mode = flight_mode_2;
+				//flight_mode = flight_mode_2;
+				set_flight_mode(flight_mode_2);
 				break;
 				default:
 				break;
@@ -113,25 +130,14 @@ int main(void) {
 		else {
 			float measured_position[3] = { nav_data_packet.bit.position_x, nav_data_packet.bit.position_y, nav_data_packet.bit.position_z };
 			float measured_orientation[3] = { nav_data_packet.bit.orientation_x, nav_data_packet.bit.orientation_y, nav_data_packet.bit.orientation_z };
+			float measured_velocity[3] = { nav_data_packet.bit.velocity_x, nav_data_packet.bit.velocity_y, nav_data_packet.bit.velocity_z };
+			float measured_acceleration[3] = { nav_data_packet.bit.accelraw_x, nav_data_packet.bit.accelraw_y, nav_data_packet.bit.accelraw_z };
 			
 			//if (guidance_run) guidance_auto(measured_position, measured_orientation, &set_origin);
-			if (flight_mode != last_flight_mode) {
-				set_origin = true;
-				control_disable_integral();
-				last_flight_mode = flight_mode;
-			}
-			
-			//switch (flight_mode) {
-				//case FLIGHT_MODE_MANUAL:
-				//guidance_manual(&pwm_in, measured_orientation);
-				//break;
-				//case FLIGHT_MODE_MANUAL_HEADING_HOLD:
-				//guidance_manual_heading_hold(&pwm_in, measured_position, measured_orientation, &set_origin);
-				//break;
-				//case FLIGHT_MODE_AUTO_WAYPOINT:
-				//if (guidance_run) guidance_auto_waypoint(measured_position, measured_orientation, &set_origin);
-				//else control_passthrough(&pwm_in);
-				//break;
+			//if (flight_mode != last_flight_mode) {
+				//set_origin = true;
+				//control_disable_integral();
+				//last_flight_mode = flight_mode;
 			//}
 			
 			switch (flight_mode) {
@@ -160,6 +166,10 @@ int main(void) {
 				
 				case FLIGHT_MODE_RTL:
 				guidance_rtl(measured_position, measured_orientation);
+				break;
+				
+				case FLIGHT_MODE_LAUNCH:
+				guidance_launch(measured_position, measured_orientation, measured_velocity, measured_acceleration, &set_origin);
 				break;
 				
 				default:
@@ -859,6 +869,7 @@ void init() {
 	guidance_run = true;
 	set_origin = true;
 	kalman_orientation_update_enabled = true;
+	set_home = false;
 	
 	last_flight_mode = flight_mode;
 	

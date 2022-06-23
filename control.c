@@ -271,7 +271,7 @@ void control_mthrottle(float thro, float roll, float pitch, float* orientation) 
 	//pwm_write(PWM_WRITE_RUDD, mixed_output[2] / 90);
 	//if (arm) pwm_write(PWM_WRITE_THRO, thro);
 	//else pwm_write(PWM_WRITE_THRO, -1.0f);
-	control_write(thro * 1.3f, mixed_output[0] / 90, mixed_output[1] / 90, mixed_output[2] / 90);
+	control_write(thro, mixed_output[0] / 90, mixed_output[1] / 90, mixed_output[2] / 90);
 }
 
 

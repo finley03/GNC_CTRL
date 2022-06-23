@@ -3,6 +3,7 @@
 #include "uart.h"
 #include "dma.h"
 #include "pwm.h"
+#include "main.h"
 
 NAV_Data_Packet nav_data_packet;
 
@@ -27,10 +28,13 @@ extern float pitch_limit;
 extern int flight_mode_0, flight_mode_1, flight_mode_2;
 extern float loiter_radius;
 extern float home_loiter_alt;
+extern float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
 
 extern bool kalman_orientation_update_enabled;
 extern bool armed;
 extern bool set_origin;
+extern bool set_home;
+extern int last_flight_mode;
 
 
 void LED_print_8(uint8_t data) {
@@ -173,6 +177,12 @@ void control_load_values() {
 	control_load_value(_FLIGHT_MODE_2);
 	control_load_value(_LOITER_RADIUS);
 	control_load_value(_HOME_LOITER_ALT);
+	control_load_value(_LAUNCH_THRO);
+	control_load_value(_LAUNCH_PITCH);
+	control_load_value(_LAUNCH_MINACC);
+	control_load_value(_LAUNCH_MINSPD);
+	control_load_value(_LAUNCH_THRODELAY);
+	control_load_value(_LAUNCH_TIME);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -270,6 +280,24 @@ void control_load_value(CTRL_Param parameter) {
 		case _HOME_LOITER_ALT:
 		spi_eeprom_read_n(EEPROM_HOME_LOITER_ALT, &home_loiter_alt, SCALAR_SIZE);
 		break;
+		case _LAUNCH_THRO:
+		spi_eeprom_read_n(EEPROM_LAUNCH_THRO, &launch_thro, SCALAR_SIZE);
+		break;
+		case _LAUNCH_PITCH:
+		spi_eeprom_read_n(EEPROM_LAUNCH_PITCH, &launch_pitch, SCALAR_SIZE);
+		break;
+		case _LAUNCH_MINACC:
+		spi_eeprom_read_n(EEPROM_LAUNCH_MINACC, &launch_minacc, SCALAR_SIZE);
+		break;
+		case _LAUNCH_MINSPD:
+		spi_eeprom_read_n(EEPROM_LAUNCH_MINSPD, &launch_minspd, SCALAR_SIZE);
+		break;
+		case _LAUNCH_THRODELAY:
+		spi_eeprom_read_n(EEPROM_LAUNCH_THRODELAY, &launch_throdelay, SCALAR_SIZE);
+		break;
+		case _LAUNCH_TIME:
+		spi_eeprom_read_n(EEPROM_LAUNCH_TIME, &launch_time, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -351,6 +379,24 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _HOME_LOITER_ALT:
 		spi_eeprom_write_n_s(EEPROM_HOME_LOITER_ALT, &home_loiter_alt, SCALAR_SIZE);
+		break;
+		case _LAUNCH_THRO:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_THRO, &launch_thro, SCALAR_SIZE);
+		break;
+		case _LAUNCH_PITCH:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_PITCH, &launch_pitch, SCALAR_SIZE);
+		break;
+		case _LAUNCH_MINACC:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_MINACC, &launch_minacc, SCALAR_SIZE);
+		break;
+		case _LAUNCH_MINSPD:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_MINSPD, &launch_minspd, SCALAR_SIZE);
+		break;
+		case _LAUNCH_THRODELAY:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_THRODELAY, &launch_throdelay, SCALAR_SIZE);
+		break;
+		case _LAUNCH_TIME:
+		spi_eeprom_write_n_s(EEPROM_LAUNCH_TIME, &launch_time, SCALAR_SIZE);
 		break;
 		default:
 		break;
@@ -556,6 +602,24 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _HOME_LOITER_ALT:
 		home_loiter_alt = *(float*)value;
 		break;
+		case _LAUNCH_THRO:
+		launch_thro = *(float*)value;
+		break;
+		case _LAUNCH_PITCH:
+		launch_pitch = *(float*)value;
+		break;
+		case _LAUNCH_MINACC:
+		launch_minacc = *(float*)value;
+		break;
+		case _LAUNCH_MINSPD:
+		launch_minspd = *(float*)value;
+		break;
+		case _LAUNCH_THRODELAY:
+		launch_throdelay = *(float*)value;
+		break;
+		case _LAUNCH_TIME:
+		launch_time = *(float*)value;
+		break;
 		default:
 		break;
 	}
@@ -637,6 +701,24 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _HOME_LOITER_ALT:
 		*(float*)value = home_loiter_alt;
+		break;
+		case _LAUNCH_THRO:
+		*(float*)value = launch_thro;
+		break;
+		case _LAUNCH_PITCH:
+		*(float*)value = launch_pitch;
+		break;
+		case _LAUNCH_MINACC:
+		*(float*)value = launch_minacc;
+		break;
+		case _LAUNCH_MINSPD:
+		*(float*)value = launch_minspd;
+		break;
+		case _LAUNCH_THRODELAY:
+		*(float*)value = launch_throdelay;
+		break;
+		case _LAUNCH_TIME:
+		*(float*)value = launch_time;
 		break;
 		default:
 		break;
@@ -775,10 +857,18 @@ void disable_kalman_orientation_update() {
 }
 
 
+void set_flight_mode(int fmode) {
+	last_flight_mode = flight_mode;
+	flight_mode = fmode;
+	set_origin = true;
+}
+
+
 void arm() {
 	if (nav_data_packet.bit.h_acc < 50) {
 		armed = true;
 		set_origin = true;
+		set_home = true;
 
 		// disable kalman position
 		nav_uart_send(0x8D);
@@ -792,18 +882,22 @@ void arm() {
 		delay_ms(10);
 		// enable kalman position
 		nav_uart_send(0x8C);
+		
 	}
 }
 
 void disarm() {
 	armed = false;
+	
+	pwm_write_thro(-1.0f);
 }
 
 void FAILSAFE() {
 	// disarm
 	//arm = false;
 	disarm();
+	
 	pwm_write_thro(-1.0f);
 	
-	// add more
+	flight_mode = FLIGHT_MODE_LOITER;
 }

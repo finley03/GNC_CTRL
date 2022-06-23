@@ -39,6 +39,12 @@ typedef enum {
 	_FLIGHT_MODE_2,
 	_LOITER_RADIUS,
 	_HOME_LOITER_ALT,
+	_LAUNCH_THRO,
+	_LAUNCH_PITCH,
+	_LAUNCH_MINACC,
+	_LAUNCH_MINSPD,
+	_LAUNCH_THRODELAY,
+	_LAUNCH_TIME,
 	
 	_CTRL_VOLATILE_PARAM_START = 8192,
 	
@@ -124,6 +130,7 @@ void wireless_flush_restart();
 void enable_kalman_orientation_update();
 void disable_kalman_orientation_update();
 
+void set_flight_mode(int fmode);
 
 void arm();
 void disarm();

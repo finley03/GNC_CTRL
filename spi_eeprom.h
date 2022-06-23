@@ -36,6 +36,12 @@
 #define EEPROM_FLIGHT_MODE_2 0x10B0 // scalar
 #define EEPROM_LOITER_RADIUS 0x10B4 // scalar
 #define EEPROM_HOME_LOITER_ALT 0x10B8 // scalar
+#define EEPROM_LAUNCH_THRO 0x10BC // scalar
+#define EEPROM_LAUNCH_PITCH 0x10C0 // scalar
+#define EEPROM_LAUNCH_MINACC 0x10C4 // scalar
+#define EEPROM_LAUNCH_MINSPD 0x10C8 // scalar
+#define EEPROM_LAUNCH_THRODELAY 0x10CC // scalar
+#define EEPROM_LAUNCH_TIME 0x10D0 // scalar
 
 #define EEPROM_NAV_CONFIG_START 0x1800
 
