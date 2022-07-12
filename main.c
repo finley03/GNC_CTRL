@@ -174,6 +174,10 @@ int main(void) {
 				guidance_launch(measured_position, measured_orientation, measured_velocity, measured_acceleration, &set_origin);
 				break;
 				
+				case FLIGHT_MODE_LAND:
+				guidance_land(measured_position, measured_orientation, &set_origin);
+				break;
+				
 				default:
 				break;
 			}

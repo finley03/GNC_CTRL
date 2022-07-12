@@ -34,6 +34,7 @@
 #define END 0x21
 #define POINT_LLA 0x22
 #define LAUNCH 0x23
+#define LAND 0x24
 
 #define ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
 #define LOITER_CCW_MASK (1 << 1)
@@ -55,6 +56,7 @@ int32_t ctrl_flags_1;
 float loiter_radius;
 float home_loiter_alt;
 
+bool valid_waypoints;
 Point origin_point;
 Point target_point;
 //Point previous_origin_point;
@@ -79,6 +81,9 @@ float landing_descent_pitch, landing_flair_pitch, landing_descent_throttle, land
 
 extern int flight_mode;
 extern int last_flight_mode;
+
+float land_heading_lock;
+bool land_heading_lock_set;
 
 //void guidance_set_origin(float* value) {
 	//mat_copy(origin_point.bit, 3, value);
@@ -185,6 +190,7 @@ bool run_code(bool reset) {
 			
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
+			valid_waypoints = true;
 			run = false;
 		}
 		break;
@@ -208,6 +214,7 @@ bool run_code(bool reset) {
 			
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
+			valid_waypoints = true;
 			run = false;
 		}
 		break;
@@ -219,8 +226,10 @@ bool run_code(bool reset) {
 		}
 		break;
 		case END:
+			FAILSAFE();
 			run = false;
 			notend = false;
+			valid_waypoints = false;
 		break;
 		case FOR_VAR:
 		{
@@ -452,6 +461,16 @@ bool run_code(bool reset) {
 		{
 			set_flight_mode(FLIGHT_MODE_LAUNCH);
 			++address;
+			valid_waypoints = false;
+			run = false;
+		}
+		break;
+		case LAND:
+		{
+			set_flight_mode(FLIGHT_MODE_LAND);
+			++address;
+			valid_waypoints = false;
+			run = false;
 		}
 		break;
 		default:
@@ -469,6 +488,8 @@ bool run_code(bool reset) {
 
 void reset_guidance() {
 	once = true;
+	valid_waypoints = false;
+	land_heading_lock_set = false;
 }
 
 
@@ -554,12 +575,13 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	
 	
 	float target_heading = 0.0f;
-	float roll = 0.0f, pitch = 0.0f;
 	
 	if (*set_origin) {
 		mat_copy(position, 3, origin_point.bit);
 		*set_origin = false;
 	}
+
+	if (!valid_waypoints && !once) run_code(false);
 	
 	// this MUST come after the set origin check or set_origin may be deleted if set by run_code
 	if (once) {
@@ -567,6 +589,9 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 		run_code(true);
 		once = false;
 	}
+	
+	// return if no valid waypoints here
+	if (!valid_waypoints) return;
 	
 	{ // scoped so variables are deleted
 		static uint32_t waypoint_start_time;
@@ -601,6 +626,9 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 			}
 		}
 	}
+	
+	// return if no valid waypoints here
+	if (!valid_waypoints) return;
 	
 	// get vector of line
 	float line_vector[3];
@@ -641,6 +669,11 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	// get line heading
 	float complex line_complex = CMPLXF(line_vector[0], line_vector[1]);
 	float line_heading = degrees(cargf(line_complex));
+	
+	//if (flight_mode == FLIGHT_MODE_LAND) {
+		//land_heading_lock = line_heading;
+		//land_heading_lock_set = true;
+	//}
 	
 	// set target heading
 	target_heading = line_heading + degrees(atanf(radians(position_offset_pid)));
@@ -697,8 +730,8 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 		//previous_error = error;
 	//}
 	
-	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
-	pitch = guidance_internal_altitude_hold(target_point.bit[2], position[2]);
+	float roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	float pitch = guidance_internal_altitude_hold(target_point.bit[2], position[2]);
 	
 	control(roll, pitch, orientation);
 }
@@ -722,6 +755,7 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HER
 	
 	float roll = pwm_in->ale * roll_limit;
 	float pitch = pwm_in->elev * pitch_limit;
+	
 	control_mthrottle(pwm_in->thro * 1.3f, roll, pitch, orientation);
 }
 
@@ -739,7 +773,6 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	
 	static float heading_lock = 0.0f;
 	static float altitude_lock = 0.0f;
-	float roll = 0.0f, pitch = 0.0f;
 	
 	if (*set_origin) {
 		heading_lock = orientation[2];
@@ -848,8 +881,8 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	
 	//pitch = pwm_in->elev * 15;
 	
-	roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
-	pitch = guidance_internal_altitude_hold(altitude_lock, position[2]);
+	float roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
+	float pitch = guidance_internal_altitude_hold(altitude_lock, position[2]);
 	
 	control(roll, pitch, orientation);
 }
@@ -868,7 +901,6 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 		
 		
 	float target_heading = 0.0f;
-	float roll = 0.0f, pitch = 0.0f;
 	
 	static float loiter_point[3];
 		
@@ -968,8 +1000,8 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 		//previous_error = error;
 	//}
 	
-	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
-	pitch = guidance_internal_altitude_hold(loiter_point[2], position[2]);
+	float roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	float pitch = guidance_internal_altitude_hold(loiter_point[2], position[2]);
 		
 	control(roll, pitch, orientation);
 }
@@ -987,7 +1019,6 @@ void guidance_rtl(float* position, float* orientation) {
 		
 		
 	float target_heading = 0.0f;
-	float roll = 0.0f, pitch = 0.0f;
 		
 	float position_offset = vec_2_length(position) - loiter_radius;
 		
@@ -1077,8 +1108,8 @@ void guidance_rtl(float* position, float* orientation) {
 		//previous_error = error;
 	//}
 	
-	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
-	pitch = guidance_internal_altitude_hold(-home_loiter_alt, position[2]);
+	float roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	float pitch = guidance_internal_altitude_hold(-home_loiter_alt, position[2]);
 		
 	control(roll, pitch, orientation);
 }
@@ -1096,7 +1127,6 @@ void guidance_launch(float* position, float* orientation, float* velocity, float
 	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
 	static float heading_lock = 0.0f;
-	float roll = 0.0f;
 	
 	// true if currently launching
 	static bool launch = false;
@@ -1174,12 +1204,33 @@ void guidance_launch(float* position, float* orientation, float* velocity, float
 		//previous_error = error;
 	//}
 	
-	roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
+	float roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
 	
 	control_mthrottle((thro) ? launch_thro : -1.0f, roll, launch_pitch, orientation);
 }
 
 
-void guidance_land(float* position, float* orientation) {
+void guidance_land(float* position, float* orientation, bool* set_origin) {
+	// true if in the flair part of landing
+	static bool flair = false;
 	
+	// reset landing mode
+	if (*set_origin) {
+		flair = false;
+		*set_origin = false;
+		
+		if (!land_heading_lock_set) land_heading_lock = orientation[2];
+	}
+	
+	land_heading_lock_set = false;
+	
+	if (-position[2] <= landing_flair_param) {
+		flair = true;
+		disarm();
+	}
+	
+	float roll = (flair) ? 0.0f : guidance_internal_heading_hold(land_heading_lock, orientation[2]);
+	
+	control_mthrottle((flair) ? -1.0f : landing_descent_throttle, roll,
+		(flair) ? landing_flair_pitch : landing_descent_pitch, orientation);
 }

@@ -614,7 +614,8 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		elevator_turn_p = *(float*)value;
 		break;
 		case _FLIGHT_MODE:
-		flight_mode = *(int*)value;
+		//flight_mode = *(int*)value;
+		set_flight_mode(*(int*)value);
 		break;
 		case _DISABLE_KALMAN_UPDATE_DELAY:
 		disable_kalman_update_delay = *(float*)value;
