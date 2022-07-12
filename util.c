@@ -29,6 +29,8 @@ extern int flight_mode_0, flight_mode_1, flight_mode_2;
 extern float loiter_radius;
 extern float home_loiter_alt;
 extern float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
+extern float fbwh_heading_slew, fbwh_altitude_slew;
+extern float landing_descent_pitch, landing_flair_pitch, landing_descent_throttle, landing_flair_param;
 
 extern bool kalman_orientation_update_enabled;
 extern bool armed;
@@ -183,6 +185,12 @@ void control_load_values() {
 	control_load_value(_LAUNCH_MINSPD);
 	control_load_value(_LAUNCH_THRODELAY);
 	control_load_value(_LAUNCH_TIME);
+	control_load_value(_FBWH_HEADING_SLEW);
+	control_load_value(_FBWH_ALTITUDE_SLEW);
+	control_load_value(_LANDING_DESCENT_PITCH);
+	control_load_value(_LANDING_FLAIR_PITCH);
+	control_load_value(_LANDING_DESCENT_THROTTLE);
+	control_load_value(_LANDING_FLAIR_PARAM);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -298,6 +306,24 @@ void control_load_value(CTRL_Param parameter) {
 		case _LAUNCH_TIME:
 		spi_eeprom_read_n(EEPROM_LAUNCH_TIME, &launch_time, SCALAR_SIZE);
 		break;
+		case _FBWH_HEADING_SLEW:
+		spi_eeprom_read_n(EEPROM_FBWH_HEADING_SLEW, &fbwh_heading_slew, SCALAR_SIZE);
+		break;
+		case _FBWH_ALTITUDE_SLEW:
+		spi_eeprom_read_n(EEPROM_FBWH_ALTITUDE_SLEW, &fbwh_altitude_slew, SCALAR_SIZE);
+		break;
+		case _LANDING_DESCENT_PITCH:
+		spi_eeprom_read_n(EEPROM_LANDING_DESCENT_PITCH, &landing_descent_pitch, SCALAR_SIZE);
+		break;
+		case _LANDING_FLAIR_PITCH:
+		spi_eeprom_read_n(EEPROM_LANDING_FLAIR_PITCH, &landing_flair_pitch, SCALAR_SIZE);
+		break;
+		case _LANDING_DESCENT_THROTTLE:
+		spi_eeprom_read_n(EEPROM_LANDING_DESCENT_THROTTLE, &landing_descent_throttle, SCALAR_SIZE);
+		break;
+		case _LANDING_FLAIR_PARAM:
+		spi_eeprom_read_n(EEPROM_LANDING_FLAIR_PARAM, &landing_flair_param, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -397,6 +423,24 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _LAUNCH_TIME:
 		spi_eeprom_write_n_s(EEPROM_LAUNCH_TIME, &launch_time, SCALAR_SIZE);
+		break;
+		case _FBWH_HEADING_SLEW:
+		spi_eeprom_write_n_s(EEPROM_FBWH_HEADING_SLEW, &fbwh_heading_slew, SCALAR_SIZE);
+		break;
+		case _FBWH_ALTITUDE_SLEW:
+		spi_eeprom_write_n_s(EEPROM_FBWH_ALTITUDE_SLEW, &fbwh_altitude_slew, SCALAR_SIZE);
+		break;
+		case _LANDING_DESCENT_PITCH:
+		spi_eeprom_write_n_s(EEPROM_LANDING_DESCENT_PITCH, &landing_descent_pitch, SCALAR_SIZE);
+		break;
+		case _LANDING_FLAIR_PITCH:
+		spi_eeprom_write_n_s(EEPROM_LANDING_FLAIR_PITCH, &landing_flair_pitch, SCALAR_SIZE);
+		break;
+		case _LANDING_DESCENT_THROTTLE:
+		spi_eeprom_write_n_s(EEPROM_LANDING_DESCENT_THROTTLE, &landing_descent_throttle, SCALAR_SIZE);
+		break;
+		case _LANDING_FLAIR_PARAM:
+		spi_eeprom_write_n_s(EEPROM_LANDING_FLAIR_PARAM, &landing_flair_param, SCALAR_SIZE);
 		break;
 		default:
 		break;
@@ -620,6 +664,24 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _LAUNCH_TIME:
 		launch_time = *(float*)value;
 		break;
+		case _FBWH_HEADING_SLEW:
+		fbwh_heading_slew = *(float*)value;
+		break;
+		case _FBWH_ALTITUDE_SLEW:
+		fbwh_altitude_slew = *(float*)value;
+		break;
+		case _LANDING_DESCENT_PITCH:
+		landing_descent_pitch = *(float*)value;
+		break;
+		case _LANDING_FLAIR_PITCH:
+		landing_flair_pitch = *(float*)value;
+		break;
+		case _LANDING_DESCENT_THROTTLE:
+		landing_descent_throttle = *(float*)value;
+		break;
+		case _LANDING_FLAIR_PARAM:
+		landing_flair_param = *(float*)value;
+		break;
 		default:
 		break;
 	}
@@ -719,6 +781,24 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _LAUNCH_TIME:
 		*(float*)value = launch_time;
+		break;
+		case _FBWH_HEADING_SLEW:
+		*(float*)value = fbwh_heading_slew;
+		break;
+		case _FBWH_ALTITUDE_SLEW:
+		*(float*)value = fbwh_altitude_slew;
+		break;
+		case _LANDING_DESCENT_PITCH:
+		*(float*)value = landing_descent_pitch;
+		break;
+		case _LANDING_FLAIR_PITCH:
+		*(float*)value = landing_flair_pitch;
+		break;
+		case _LANDING_DESCENT_THROTTLE:
+		*(float*)value = landing_descent_throttle;
+		break;
+		case _LANDING_FLAIR_PARAM:
+		*(float*)value = landing_flair_param;
 		break;
 		default:
 		break;
@@ -899,5 +979,5 @@ void FAILSAFE() {
 	
 	pwm_write_thro(-1.0f);
 	
-	flight_mode = FLIGHT_MODE_LOITER;
+	set_flight_mode(FLIGHT_MODE_RTL);
 }

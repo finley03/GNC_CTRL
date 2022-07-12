@@ -140,6 +140,8 @@ int main(void) {
 				//last_flight_mode = flight_mode;
 			//}
 			
+			guidance_new_frame();
+			
 			switch (flight_mode) {
 				case FLIGHT_MODE_MANUAL:
 				control_passthrough(&pwm_in);

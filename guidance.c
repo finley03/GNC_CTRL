@@ -73,6 +73,10 @@ float home_latitude, home_longitude, home_z;
 
 float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
 
+float fbwh_heading_slew, fbwh_altitude_slew;
+
+float landing_descent_pitch, landing_flair_pitch, landing_descent_throttle, landing_flair_param;
+
 extern int flight_mode;
 extern int last_flight_mode;
 
@@ -467,35 +471,101 @@ void reset_guidance() {
 	once = true;
 }
 
-//void guidance(float* position, float orientation_z, float* roll, float* pitch) {
-	//*roll = -orientation_z * 0.7;
-	//pitch = 0;
-//}
 
-void guidance_auto_waypoint(float* position, float* orientation, bool* set_origin) {
+uint32_t current_time;
+float i_time;
+
+void guidance_new_frame() {
 	static uint32_t previous_time = 0;
 	// get current time
-	uint32_t current_time = read_timer_20ns();
+	current_time = read_timer_20ns();
 	// calculate time difference
 	uint32_t delta_time = current_time - previous_time;
 	// reset previous time
 	previous_time = current_time;
 	// convert previous time to float
-	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	i_time = delta_time * TIMER_S_MULTIPLIER;
+}
+
+// returns roll value
+float guidance_internal_heading_hold(float target_heading, float measured_heading) {
+	// run PID on heading
+	if (measured_heading > target_heading + 180) target_heading += 360;
+	if (measured_heading < target_heading - 180) target_heading -= 360;
+	
+	float error = target_heading - measured_heading;
+	static float previous_error = 0;
+	static float integral = 0;
+		
+	// proportional
+	float proportional = error;
+		
+	// integral
+	float error_dt = error * i_time;
+	integral += error_dt;
+		
+	// derivative
+	float delta_error = error - previous_error;
+	float derivative = delta_error / i_time;
+		
+	float roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+		
+	previous_error = error;
+	
+	return roll;
+}
+
+// returns pitch value
+float guidance_internal_altitude_hold(float target_altitude, float measured_altitude) {
+	// run PID on altitude
+	// error points UP
+	float error = measured_altitude - target_altitude;
+	static float previous_error = 0;
+	static float integral = 0;
+		
+	// proportional
+	float proportional = error;
+		
+	// integral
+	float error_dt = error * i_time;
+	integral += error_dt;
+		
+	// derivative
+	float delta_error = error - previous_error;
+	float derivative = delta_error / i_time;
+		
+	float pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+		
+	previous_error = error;
+	
+	return pitch;
+}
+
+void guidance_auto_waypoint(float* position, float* orientation, bool* set_origin) {
+	//static uint32_t previous_time = 0;
+	//// get current time
+	//uint32_t current_time = read_timer_20ns();
+	//// calculate time difference
+	//uint32_t delta_time = current_time - previous_time;
+	//// reset previous time
+	//previous_time = current_time;
+	//// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
 	
 	float target_heading = 0.0f;
 	float roll = 0.0f, pitch = 0.0f;
 	
+	if (*set_origin) {
+		mat_copy(position, 3, origin_point.bit);
+		*set_origin = false;
+	}
+	
+	// this MUST come after the set origin check or set_origin may be deleted if set by run_code
 	if (once) {
 		mat_copy(position, 3, origin_point.bit);
 		run_code(true);
 		once = false;
-	}
-	
-	if (*set_origin) {
-		mat_copy(position, 3, origin_point.bit);
-		*set_origin = false;
 	}
 	
 	{ // scoped so variables are deleted
@@ -578,54 +648,57 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	if (target_heading > 180) target_heading -= 360;
 	if (target_heading <= -180) target_heading += 360;
 	
-	// run PID on heading
-	float measured_heading = orientation[2];
-	if (measured_heading > target_heading + 180) target_heading += 360;
-	if (measured_heading < target_heading - 180) target_heading -= 360;
+	//// run PID on heading
+	//float measured_heading = orientation[2];
+	//if (measured_heading > target_heading + 180) target_heading += 360;
+	//if (measured_heading < target_heading - 180) target_heading -= 360;
+	//
+	//{
+		//float error = target_heading - measured_heading;
+		//static float previous_error = 0;
+		//static float integral = 0;
+		//
+		//// proportional
+		//float proportional = error;
+		//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+		//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+		//
+		//roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+		//
+		//previous_error = error;
+	//}
+	//
+	//// run PID on altitude
+	//{
+		//// error points UP
+		//float error = position[2] - target_point.bit[2];
+		//static float previous_error = 0;
+		//static float integral = 0;
+		//
+		//// proportional
+		//float proportional = error;
+		//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+		//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+		//
+		//pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+		//
+		//previous_error = error;
+	//}
 	
-	{
-		float error = target_heading - measured_heading;
-		static float previous_error = 0;
-		static float integral = 0;
-		
-		// proportional
-		float proportional = error;
-		
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-		
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-		
-		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-		
-		previous_error = error;
-	}
-	
-	// run PID on altitude
-	{
-		// error points UP
-		float error = position[2] - target_point.bit[2];
-		static float previous_error = 0;
-		static float integral = 0;
-		
-		// proportional
-		float proportional = error;
-		
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-		
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-		
-		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
-		
-		previous_error = error;
-	}
+	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	pitch = guidance_internal_altitude_hold(target_point.bit[2], position[2]);
 	
 	control(roll, pitch, orientation);
 }
@@ -653,15 +726,15 @@ void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HER
 }
 
 void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orientation, bool* set_origin) {
-	static uint32_t previous_time = 0;
-	// get current time
-	uint32_t current_time = read_timer_20ns();
-	// calculate time difference
-	uint32_t delta_time = current_time - previous_time;
-	// reset previous time
-	previous_time = current_time;
-	// convert previous time to float
-	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	//static uint32_t previous_time = 0;
+	//// get current time
+	//uint32_t current_time = read_timer_20ns();
+	//// calculate time difference
+	//uint32_t delta_time = current_time - previous_time;
+	//// reset previous time
+	//previous_time = current_time;
+	//// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
 	
 	static float heading_lock = 0.0f;
@@ -685,8 +758,13 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 			//kalman_orientation_update_enabled = false;
 		}
 		
-		roll = pwm_in->ale * roll_limit;
-		end_turn = true;
+		//roll = pwm_in->ale * roll_limit;
+		//end_turn = true;
+		
+		heading_lock += pwm_in->ale * fbwh_heading_slew * i_time;
+		
+		if (heading_lock > 180) heading_lock -= 360;
+		else if (heading_lock <= -180) heading_lock += 360;
 	}
 	else {
 		if (!kalman_orientation_update_enabled) {
@@ -695,89 +773,98 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 			// set heading lock
 		}
 		
-		if (end_turn) {
-			heading_lock = orientation[2];
-			end_turn = false;
-		}
+		//if (end_turn) {
+			//heading_lock = orientation[2];
+			//end_turn = false;
+		//}
 		
-		// run PID on heading
-		float measured_heading = orientation[2];
-		if (heading_lock > measured_heading + 180) measured_heading += 360;
-		if (heading_lock < measured_heading - 180) measured_heading -= 360;
+		//// run PID on heading
+		//float measured_heading = orientation[2];
+		//if (heading_lock > measured_heading + 180) measured_heading += 360;
+		//if (heading_lock < measured_heading - 180) measured_heading -= 360;
+		//
+		//{
+			//float error = heading_lock - measured_heading;
+			//static float previous_error = 0;
+			//static float integral = 0;
+			//
+			//// proportional
+			//float proportional = error;
+			//
+			//// integral
+			//float error_dt = error * i_time;
+			//integral += error_dt;
+			//
+			//// derivative
+			//float delta_error = error - previous_error;
+			//float derivative = delta_error / i_time;
+			//
+			//roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			//
+			//previous_error = error;
+		//}
 		
-		{
-			float error = heading_lock - measured_heading;
-			static float previous_error = 0;
-			static float integral = 0;
-			
-			// proportional
-			float proportional = error;
-			
-			// integral
-			float error_dt = error * i_time;
-			integral += error_dt;
-			
-			// derivative
-			float delta_error = error - previous_error;
-			float derivative = delta_error / i_time;
-			
-			roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-			
-			previous_error = error;
-		}
+		//roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
 	}
 	
 	static bool altitude_once = true;
 	if (ABS(pwm_in->elev) > 0.05f) {
-		pitch = pwm_in->elev * pitch_limit;
-		altitude_once = true;
+		//pitch = pwm_in->elev * pitch_limit;
+		//altitude_once = true;
+		
+		altitude_lock -= pwm_in->elev * fbwh_altitude_slew * i_time;
 	}
 	else {
-		if (altitude_once) {
-			altitude_lock = position[2];
-			altitude_once = false;
-		}
+		//if (altitude_once) {
+			//altitude_lock = position[2];
+			//altitude_once = false;
+		//}
 		
-		// run PID on altitude
-		{
-			// error points UP
-			float error = position[2] - altitude_lock;
-			static float previous_error = 0;
-			static float integral = 0;
-			
-			// proportional
-			float proportional = error;
-			
-			// integral
-			float error_dt = error * i_time;
-			integral += error_dt;
-			
-			// derivative
-			float delta_error = error - previous_error;
-			float derivative = delta_error / i_time;
-			
-			pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
-			
-			previous_error = error;
-		}
+		//// run PID on altitude
+		//{
+			//// error points UP
+			//float error = position[2] - altitude_lock;
+			//static float previous_error = 0;
+			//static float integral = 0;
+			//
+			//// proportional
+			//float proportional = error;
+			//
+			//// integral
+			//float error_dt = error * i_time;
+			//integral += error_dt;
+			//
+			//// derivative
+			//float delta_error = error - previous_error;
+			//float derivative = delta_error / i_time;
+			//
+			//pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			//
+			//previous_error = error;
+		//}
+		
+		//pitch = guidance_internal_altitude_hold(altitude_lock, position[2]);
 	}
 	
 	//pitch = pwm_in->elev * 15;
+	
+	roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
+	pitch = guidance_internal_altitude_hold(altitude_lock, position[2]);
 	
 	control(roll, pitch, orientation);
 }
 
 
 void guidance_loiter(float* position, float* orientation, bool* set_origin) {
-	static uint32_t previous_time = 0;
-	// get current time
-	uint32_t current_time = read_timer_20ns();
-	// calculate time difference
-	uint32_t delta_time = current_time - previous_time;
-	// reset previous time
-	previous_time = current_time;
-	// convert previous time to float
-	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	//static uint32_t previous_time = 0;
+	//// get current time
+	//uint32_t current_time = read_timer_20ns();
+	//// calculate time difference
+	//uint32_t delta_time = current_time - previous_time;
+	//// reset previous time
+	//previous_time = current_time;
+	//// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
 		
 	float target_heading = 0.0f;
@@ -832,68 +919,71 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 	if (target_heading > 180) target_heading -= 360;
 	if (target_heading <= -180) target_heading += 360;
 		
-	// run PID on heading
-	float measured_heading = orientation[2];
-	if (measured_heading > target_heading + 180) target_heading += 360;
-	if (measured_heading < target_heading - 180) target_heading -= 360;
-		
-	{
-		float error = target_heading - measured_heading;
-		static float previous_error = 0;
-		static float integral = 0;
-			
-		// proportional
-		float proportional = error;
-			
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-			
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-			
-		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-			
-		previous_error = error;
-	}
-		
-	// run PID on altitude
-	{
-		// error points UP
-		float error = position[2] - loiter_point[2];
-		static float previous_error = 0;
-		static float integral = 0;
-			
-		// proportional
-		float proportional = error;
-			
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-			
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-			
-		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
-			
-		previous_error = error;
-	}
+	//// run PID on heading
+	//float measured_heading = orientation[2];
+	//if (measured_heading > target_heading + 180) target_heading += 360;
+	//if (measured_heading < target_heading - 180) target_heading -= 360;
+		//
+	//{
+		//float error = target_heading - measured_heading;
+		//static float previous_error = 0;
+		//static float integral = 0;
+			//
+		//// proportional
+		//float proportional = error;
+			//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+			//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+			//
+		//roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			//
+		//previous_error = error;
+	//}
+		//
+	//// run PID on altitude
+	//{
+		//// error points UP
+		//float error = position[2] - loiter_point[2];
+		//static float previous_error = 0;
+		//static float integral = 0;
+			//
+		//// proportional
+		//float proportional = error;
+			//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+			//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+			//
+		//pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			//
+		//previous_error = error;
+	//}
+	
+	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	pitch = guidance_internal_altitude_hold(loiter_point[2], position[2]);
 		
 	control(roll, pitch, orientation);
 }
 
 void guidance_rtl(float* position, float* orientation) {
-	static uint32_t previous_time = 0;
-	// get current time
-	uint32_t current_time = read_timer_20ns();
-	// calculate time difference
-	uint32_t delta_time = current_time - previous_time;
-	// reset previous time
-	previous_time = current_time;
-	// convert previous time to float
-	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	//static uint32_t previous_time = 0;
+	//// get current time
+	//uint32_t current_time = read_timer_20ns();
+	//// calculate time difference
+	//uint32_t delta_time = current_time - previous_time;
+	//// reset previous time
+	//previous_time = current_time;
+	//// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 		
 		
 	float target_heading = 0.0f;
@@ -938,71 +1028,74 @@ void guidance_rtl(float* position, float* orientation) {
 	if (target_heading > 180) target_heading -= 360;
 	if (target_heading <= -180) target_heading += 360;
 		
-	// run PID on heading
-	float measured_heading = orientation[2];
-	if (measured_heading > target_heading + 180) target_heading += 360;
-	if (measured_heading < target_heading - 180) target_heading -= 360;
-		
-	{
-		float error = target_heading - measured_heading;
-		static float previous_error = 0;
-		static float integral = 0;
-			
-		// proportional
-		float proportional = error;
-			
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-			
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-			
-		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-			
-		previous_error = error;
-	}
-		
-	// run PID on altitude
-	{
-		// error points UP
-		float error = position[2] + home_loiter_alt;
-		static float previous_error = 0;
-		static float integral = 0;
-			
-		// proportional
-		float proportional = error;
-			
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-			
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-			
-		pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
-			
-		previous_error = error;
-	}
+	//// run PID on heading
+	//float measured_heading = orientation[2];
+	//if (measured_heading > target_heading + 180) target_heading += 360;
+	//if (measured_heading < target_heading - 180) target_heading -= 360;
+		//
+	//{
+		//float error = target_heading - measured_heading;
+		//static float previous_error = 0;
+		//static float integral = 0;
+			//
+		//// proportional
+		//float proportional = error;
+			//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+			//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+			//
+		//roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+			//
+		//previous_error = error;
+	//}
+		//
+	//// run PID on altitude
+	//{
+		//// error points UP
+		//float error = position[2] + home_loiter_alt;
+		//static float previous_error = 0;
+		//static float integral = 0;
+			//
+		//// proportional
+		//float proportional = error;
+			//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+			//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+			//
+		//pitch = proportional * altitude_pid[0] + integral * altitude_pid[1] + derivative * altitude_pid[2];
+			//
+		//previous_error = error;
+	//}
+	
+	roll = guidance_internal_heading_hold(target_heading, orientation[2]);
+	pitch = guidance_internal_altitude_hold(-home_loiter_alt, position[2]);
 		
 	control(roll, pitch, orientation);
 }
 
 
 void guidance_launch(float* position, float* orientation, float* velocity, float* acceleration, bool* set_origin) {
-	static uint32_t previous_time = 0;
-	// get current time
-	uint32_t current_time = read_timer_20ns();
-	// calculate time difference
-	uint32_t delta_time = current_time - previous_time;
-	// reset previous time
-	previous_time = current_time;
-	// convert previous time to float
-	float i_time = delta_time * TIMER_S_MULTIPLIER;
+	//static uint32_t previous_time = 0;
+	//// get current time
+	//uint32_t current_time = read_timer_20ns();
+	//// calculate time difference
+	//uint32_t delta_time = current_time - previous_time;
+	//// reset previous time
+	//previous_time = current_time;
+	//// convert previous time to float
+	//float i_time = delta_time * TIMER_S_MULTIPLIER;
 	
-	float heading_lock = 0.0f;
+	static float heading_lock = 0.0f;
 	float roll = 0.0f;
 	
 	// true if currently launching
@@ -1013,10 +1106,11 @@ void guidance_launch(float* position, float* orientation, float* velocity, float
 	// reset launch mode
 	if (*set_origin) {
 		launch = false;
+		thro = false;
 		*set_origin = false;
 	}
 	
-	if (!launch) heading_lock = orientation[2];
+	if (!thro) heading_lock = orientation[2];
 	
 	static uint32_t launch_start_time = 0;
 	static float time_since_launch = 0;
@@ -1024,18 +1118,29 @@ void guidance_launch(float* position, float* orientation, float* velocity, float
 	else time_since_launch = 0;
 	
 	// quit launch mode
-	if (launch && time_since_launch >= launch_time) set_flight_mode(last_flight_mode);
+	if (launch && (time_since_launch >= launch_time)) {
+		set_flight_mode(last_flight_mode);
+	}
 	
 	// check if acceleration is above minimum
-	if (!launch && acceleration[0] >= launch_minacc) {
+	if (!launch && (acceleration[0] >= launch_minacc)) {
 		// enable launch
 		launch = true;
 		
 		launch_start_time = current_time;
 	}
 	
-	if (time_since_launch >= launch_throdelay) {
-		if (launch && !thro && vec_3_length(velocity) >= launch_minspd) {
+	//if (time_since_launch >= launch_throdelay) {
+		//if (launch && !thro && vec_3_length(velocity) >= launch_minspd) {
+			//thro = true;
+		//}
+		//else {
+			//launch = false;
+		//}
+	//}
+	
+	if (launch && !thro && time_since_launch >= launch_throdelay) {
+		if (vec_3_length(velocity) > launch_minspd) {
 			thro = true;
 		}
 		else {
@@ -1043,31 +1148,38 @@ void guidance_launch(float* position, float* orientation, float* velocity, float
 		}
 	}
 	
-	// run PID on heading
-	float measured_heading = orientation[2];
-	if (heading_lock > measured_heading + 180) measured_heading += 360;
-	if (heading_lock < measured_heading - 180) measured_heading -= 360;
+	//// run PID on heading
+	//float measured_heading = orientation[2];
+	//if (heading_lock > measured_heading + 180) measured_heading += 360;
+	//if (heading_lock < measured_heading - 180) measured_heading -= 360;
+	//
+	//{
+		//float error = heading_lock - measured_heading;
+		//static float previous_error = 0;
+		//static float integral = 0;
+		//
+		//// proportional
+		//float proportional = error;
+		//
+		//// integral
+		//float error_dt = error * i_time;
+		//integral += error_dt;
+		//
+		//// derivative
+		//float delta_error = error - previous_error;
+		//float derivative = delta_error / i_time;
+		//
+		//roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
+		//
+		//previous_error = error;
+	//}
 	
-	{
-		float error = heading_lock - measured_heading;
-		static float previous_error = 0;
-		static float integral = 0;
-		
-		// proportional
-		float proportional = error;
-		
-		// integral
-		float error_dt = error * i_time;
-		integral += error_dt;
-		
-		// derivative
-		float delta_error = error - previous_error;
-		float derivative = delta_error / i_time;
-		
-		roll = proportional * heading_pid[0] + integral * heading_pid[1] + derivative * heading_pid[2];
-		
-		previous_error = error;
-	}
+	roll = guidance_internal_heading_hold(heading_lock, orientation[2]);
 	
 	control_mthrottle((thro) ? launch_thro : -1.0f, roll, launch_pitch, orientation);
+}
+
+
+void guidance_land(float* position, float* orientation) {
+	
 }

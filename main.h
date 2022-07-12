@@ -11,12 +11,13 @@
 
 typedef enum {
 	FLIGHT_MODE_MANUAL, // manual override on all control surfaces
-	FLIGHT_MODE_FBW, // fly by wire with manual pitch and bank
+	FLIGHT_MODE_FBW, // fly by wire with manual pitch and bank, manual throttle
 	FLIGHT_MODE_FBWH, // fly by wire with automatic pitch and bank, manual heading and altitude
 	FLIGHT_MODE_AUTO, // follow mission
 	FLIGHT_MODE_LOITER, // loiters point where mode was enabled
 	FLIGHT_MODE_RTL, // returns to the launch position
-	FLIGHT_MODE_LAUNCH
+	FLIGHT_MODE_LAUNCH, // performs an automatic takeoff when a throw is detected
+	FLIGHT_MODE_LAND // lands the aircraft
 } Flight_Mode;
 
 #endif
