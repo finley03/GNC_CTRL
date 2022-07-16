@@ -31,6 +31,7 @@ extern float home_loiter_alt;
 extern float launch_thro, launch_pitch, launch_minacc, launch_minspd, launch_throdelay, launch_time;
 extern float fbwh_heading_slew, fbwh_altitude_slew;
 extern float landing_descent_pitch, landing_flair_pitch, landing_descent_throttle, landing_flair_param;
+int failsafe_flight_mode;
 
 extern bool kalman_orientation_update_enabled;
 extern bool armed;
@@ -191,6 +192,7 @@ void control_load_values() {
 	control_load_value(_LANDING_FLAIR_PITCH);
 	control_load_value(_LANDING_DESCENT_THROTTLE);
 	control_load_value(_LANDING_FLAIR_PARAM);
+	control_load_value(_FAILSAFE_FLIGHT_MODE);
 	nav_load_vec3(_KALMAN_POSITION_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_VELOCITY_UNCERTAINTY);
 	nav_load_vec3(_KALMAN_ORIENTATION_UNCERTAINTY);
@@ -324,6 +326,9 @@ void control_load_value(CTRL_Param parameter) {
 		case _LANDING_FLAIR_PARAM:
 		spi_eeprom_read_n(EEPROM_LANDING_FLAIR_PARAM, &landing_flair_param, SCALAR_SIZE);
 		break;
+		case _FAILSAFE_FLIGHT_MODE:
+		spi_eeprom_read_n(EEPROM_FAILSAFE_FLIGHT_MODE, &failsafe_flight_mode, SCALAR_SIZE);
+		break;
 		default:
 		break;
 	}
@@ -441,6 +446,9 @@ void control_save_value(CTRL_Param parameter) {
 		break;
 		case _LANDING_FLAIR_PARAM:
 		spi_eeprom_write_n_s(EEPROM_LANDING_FLAIR_PARAM, &landing_flair_param, SCALAR_SIZE);
+		break;
+		case _FAILSAFE_FLIGHT_MODE:
+		spi_eeprom_write_n_s(EEPROM_FAILSAFE_FLIGHT_MODE, &failsafe_flight_mode, SCALAR_SIZE);
 		break;
 		default:
 		break;
@@ -683,6 +691,9 @@ void control_set_value(CTRL_Param parameter, void* value) {
 		case _LANDING_FLAIR_PARAM:
 		landing_flair_param = *(float*)value;
 		break;
+		case _FAILSAFE_FLIGHT_MODE:
+		failsafe_flight_mode = *(int*)value;
+		break;
 		default:
 		break;
 	}
@@ -800,6 +811,9 @@ void control_read_value(CTRL_Param parameter, void* value) {
 		break;
 		case _LANDING_FLAIR_PARAM:
 		*(float*)value = landing_flair_param;
+		break;
+		case _FAILSAFE_FLIGHT_MODE:
+		*(int*)value = failsafe_flight_mode;
 		break;
 		default:
 		break;
@@ -976,9 +990,9 @@ void disarm() {
 void FAILSAFE() {
 	// disarm
 	//arm = false;
-	disarm();
+	if (ctrl_flags_1 & CTRL_FLAGS_1_DISARM_ON_FAILSAFE_MASK) disarm();
 	
-	pwm_write_thro(-1.0f);
+	//pwm_write_thro(-1.0f);
 	
-	set_flight_mode(FLIGHT_MODE_RTL);
+	set_flight_mode(failsafe_flight_mode);
 }

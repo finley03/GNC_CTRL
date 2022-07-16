@@ -35,9 +35,10 @@
 #define POINT_LLA 0x22
 #define LAUNCH 0x23
 #define LAND 0x24
+#define RTL 0x25
 
-#define ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
-#define LOITER_CCW_MASK (1 << 1)
+//#define CTRL_FLAGS_1_ENABLE_DISABLING_KALMAN_UPDATE_MASK (1 << 0)
+//#define CTRL_FLAGS_1_LOITER_CCW_MASK (1 << 1)
 
 typedef union {
 	float bit[3];
@@ -60,7 +61,7 @@ bool valid_waypoints;
 Point origin_point;
 Point target_point;
 //Point previous_origin_point;
-float target_plane_normal[3];
+//float target_plane_normal[3];
 //float target_line_point[3];
 //float target_line_vector[3];
 
@@ -99,6 +100,9 @@ void skip_to(uint32_t* address, uint8_t opcode) {
 		case ENDIF:
 		case BREAK_WHILE:
 		case END:
+		case LAUNCH:
+		case LAND:
+		case RTL:
 			*address += 1;
 			break;
 
@@ -185,8 +189,8 @@ bool run_code(bool reset) {
 				target_point.reg[i] = spi_eeprom_read_byte(++address);
 			}
 			
-			mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
-			vec_3_normalize(target_plane_normal, target_plane_normal);
+			//mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
+			//vec_3_normalize(target_plane_normal, target_plane_normal);
 			
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
@@ -209,8 +213,8 @@ bool run_code(bool reset) {
 			
 			target_point.bit[2] = -lla.bit[2];
 			
-			mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
-			vec_3_normalize(target_plane_normal, target_plane_normal);
+			//mat_subtract(target_point.bit, origin_point.bit, 3, target_plane_normal);
+			//vec_3_normalize(target_plane_normal, target_plane_normal);
 			
 			++address;
 			//printf("%f, %f, %f\n", target.bit[0], target.bit[1], target.bit[2]);
@@ -473,6 +477,14 @@ bool run_code(bool reset) {
 			run = false;
 		}
 		break;
+		case RTL:
+		{
+			set_flight_mode(FLIGHT_MODE_RTL);
+			++address;
+			valid_waypoints = false;
+			run = false;
+		}
+		break;
 		default:
 			//printf("Unrecognized command %02X at address %08X\n", code[address], address);
 			++address;
@@ -593,9 +605,13 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 	// return if no valid waypoints here
 	if (!valid_waypoints) return;
 	
+	// get vector of line
+	float line_vector[3];
+	mat_subtract(target_point.bit, origin_point.bit, 3, line_vector);
+	
 	{ // scoped so variables are deleted
-		static uint32_t waypoint_start_time;
-		uint32_t waypoint_current_time;
+		//static uint32_t waypoint_start_time;
+		//uint32_t waypoint_current_time;
 				
 		// get vector from position to target
 		float position_target_vector[3];
@@ -603,36 +619,35 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 		// check if waypoint has been reached
 		
 		// if the waypoint is missed and the plane goes past it, count it as hit
-		float waypoint_dotp = mat_dotp(target_point.bit, target_plane_normal, 3);
-		float current_dotp = mat_dotp(position, target_plane_normal, 3);
+		//float waypoint_dotp = mat_dotp(target_point.bit, target_plane_normal, 3);
+		//float current_dotp = mat_dotp(position, target_plane_normal, 3);
+		float waypoint_dotp = mat_dotp(target_point.bit, line_vector, 2);
+		float current_dotp = mat_dotp(position, line_vector, 2);
 		
-		if (vec_2_length(position_target_vector) <= waypoint_threshold || current_dotp > waypoint_dotp) {
+		if (vec_2_length(position_target_vector) <= waypoint_threshold || current_dotp >= waypoint_dotp) {
 			// set next waypoint
 			run_code(false);
-			// disable kalman orientation update if flag is set
-			if (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
-				disable_kalman_orientation_update();
-				waypoint_start_time = read_timer_20ns();
-			}
+			//// disable kalman orientation update if flag is set
+			//if (ctrl_flags_1 & CTRL_FLAGS_1_ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
+				//disable_kalman_orientation_update();
+				//waypoint_start_time = read_timer_20ns();
+			//}
+			mat_subtract(target_point.bit, origin_point.bit, 3, line_vector);
 		}
-		
-		// reenable orientation update
-		if (!kalman_orientation_update_enabled && (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
-			waypoint_current_time = read_timer_20ns();
-			uint32_t waypoint_delta_time = waypoint_current_time - waypoint_start_time;
-			float waypoint_time = (float)waypoint_delta_time * TIMER_S_MULTIPLIER;
-			if (waypoint_time >= MIN_2(80.0f, disable_kalman_update_delay)) { // 80 seconds is near the max for a 32 bit unsigned int
-				enable_kalman_orientation_update();
-			}
-		}
+		//
+		//// reenable orientation update
+		//if (!kalman_orientation_update_enabled && (ctrl_flags_1 & CTRL_FLAGS_1_ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
+			//waypoint_current_time = read_timer_20ns();
+			//uint32_t waypoint_delta_time = waypoint_current_time - waypoint_start_time;
+			//float waypoint_time = (float)waypoint_delta_time * TIMER_S_MULTIPLIER;
+			//if (waypoint_time >= MIN_2(80.0f, disable_kalman_update_delay)) { // 80 seconds is near the max for a 32 bit unsigned int
+				//enable_kalman_orientation_update();
+			//}
+		//}
 	}
 	
 	// return if no valid waypoints here
 	if (!valid_waypoints) return;
-	
-	// get vector of line
-	float line_vector[3];
-	mat_subtract(target_point.bit, origin_point.bit, 3, line_vector);
 	
 	//// get normalized vector of line
 	//float line_vector_2d_norm[2];
@@ -737,21 +752,21 @@ void guidance_auto_waypoint(float* position, float* orientation, bool* set_origi
 }
 
 void guidance_manual(PWM_in* pwm_in, float* orientation) { // THERE IS A BUG HERE WITH KALMAN UPDATE - MUST FIX LATER OR WILL FORGET IT EXISTS
-	//static bool kalman_orientation_update_enabled = false;
-	if (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
-		if (ABS(pwm_in->ale) > 0.05) {
-			if (kalman_orientation_update_enabled) {
-				disable_kalman_orientation_update();
-				//kalman_orientation_update_enabled = false;
-			}
-		}
-		else {
-			if (!kalman_orientation_update_enabled) {
-				enable_kalman_orientation_update();
-				//kalman_orientation_update_enabled = true;
-			}
-		}
-	}
+	////static bool kalman_orientation_update_enabled = false;
+	//if (ctrl_flags_1 & CTRL_FLAGS_1_ENABLE_DISABLING_KALMAN_UPDATE_MASK) {
+		//if (ABS(pwm_in->ale) > 0.05) {
+			//if (kalman_orientation_update_enabled) {
+				//disable_kalman_orientation_update();
+				////kalman_orientation_update_enabled = false;
+			//}
+		//}
+		//else {
+			//if (!kalman_orientation_update_enabled) {
+				//enable_kalman_orientation_update();
+				////kalman_orientation_update_enabled = true;
+			//}
+		//}
+	//}
 	
 	float roll = pwm_in->ale * roll_limit;
 	float pitch = pwm_in->elev * pitch_limit;
@@ -786,10 +801,10 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 	
 	//static bool kalman_orientation_update_enabled = false;
 	if (ABS(pwm_in->ale) > 0.05f) {
-		if (kalman_orientation_update_enabled && (ctrl_flags_1 & ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
-			disable_kalman_orientation_update();
-			//kalman_orientation_update_enabled = false;
-		}
+		//if (kalman_orientation_update_enabled && (ctrl_flags_1 & CTRL_FLAGS_1_ENABLE_DISABLING_KALMAN_UPDATE_MASK)) {
+			//disable_kalman_orientation_update();
+			////kalman_orientation_update_enabled = false;
+		//}
 		
 		//roll = pwm_in->ale * roll_limit;
 		//end_turn = true;
@@ -800,11 +815,11 @@ void guidance_manual_heading_hold(PWM_in* pwm_in, float* position, float* orient
 		else if (heading_lock <= -180) heading_lock += 360;
 	}
 	else {
-		if (!kalman_orientation_update_enabled) {
-			enable_kalman_orientation_update();
-			//kalman_orientation_update_enabled = true;
-			// set heading lock
-		}
+		//if (!kalman_orientation_update_enabled) {
+			//enable_kalman_orientation_update();
+			////kalman_orientation_update_enabled = true;
+			//// set heading lock
+		//}
 		
 		//if (end_turn) {
 			//heading_lock = orientation[2];
@@ -914,7 +929,7 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 	
 	float position_offset = vec_2_length(point_position_vector) - loiter_radius;
 	
-	position_offset = (ctrl_flags_1 & LOITER_CCW_MASK) ? -position_offset : position_offset;
+	position_offset = (ctrl_flags_1 & CTRL_FLAGS_1_LOITER_CCW_MASK) ? -position_offset : position_offset;
 		
 	// run PID on position offset
 	float position_offset_pid;
@@ -941,7 +956,7 @@ void guidance_loiter(float* position, float* orientation, bool* set_origin) {
 		
 	// get line heading
 	float complex line_complex;
-	if (ctrl_flags_1 & LOITER_CCW_MASK) line_complex = CMPLXF(point_position_vector[1], -point_position_vector[0]);
+	if (ctrl_flags_1 & CTRL_FLAGS_1_LOITER_CCW_MASK) line_complex = CMPLXF(point_position_vector[1], -point_position_vector[0]);
 	else line_complex = CMPLXF(-point_position_vector[1], point_position_vector[0]);
 	float line_heading = degrees(cargf(line_complex));
 		
@@ -1022,7 +1037,7 @@ void guidance_rtl(float* position, float* orientation) {
 		
 	float position_offset = vec_2_length(position) - loiter_radius;
 		
-	position_offset = (ctrl_flags_1 & LOITER_CCW_MASK) ? -position_offset : position_offset;
+	position_offset = (ctrl_flags_1 & CTRL_FLAGS_1_LOITER_CCW_MASK) ? -position_offset : position_offset;
 		
 	// run PID on position offset
 	float position_offset_pid;
@@ -1049,7 +1064,7 @@ void guidance_rtl(float* position, float* orientation) {
 		
 	// get line heading
 	float complex line_complex;
-	if (ctrl_flags_1 & LOITER_CCW_MASK) line_complex = CMPLXF(position[1], -position[0]);
+	if (ctrl_flags_1 & CTRL_FLAGS_1_LOITER_CCW_MASK) line_complex = CMPLXF(position[1], -position[0]);
 	else line_complex = CMPLXF(-position[1], position[0]);
 	float line_heading = degrees(cargf(line_complex));
 		
