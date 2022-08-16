@@ -1244,7 +1244,8 @@ void guidance_land(float* position, float* orientation, bool* set_origin) {
 		disarm();
 	}
 	
-	float roll = (flair) ? 0.0f : guidance_internal_heading_hold(land_heading_lock, orientation[2]);
+	//float roll = (flair) ? 0.0f : guidance_internal_heading_hold(land_heading_lock, orientation[2]);
+	float roll = guidance_internal_heading_hold(land_heading_lock, orientation[2]);
 	
 	control_mthrottle((flair) ? -1.0f : landing_descent_throttle, roll,
 		(flair) ? landing_flair_pitch : landing_descent_pitch, orientation);
